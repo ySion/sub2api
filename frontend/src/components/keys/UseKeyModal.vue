@@ -616,118 +616,43 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
       }
     }
   }
+  const openaiTextImageModalities = {
+    input: ['text', 'image'],
+    output: ['text']
+  }
+  const openaiReasoningVariants = {
+    low: {},
+    medium: {},
+    high: {},
+    xhigh: {}
+  }
+  const openaiCodexMiniVariants = {
+    low: {},
+    medium: {},
+    high: {}
+  }
+  const openaiModel = (
+    name: string,
+    limit: { context: number; output: number },
+    variants: Record<string, Record<string, never>>
+  ) => ({
+    name,
+    options: {
+      store: false,
+      supportsImages: true
+    },
+    variants,
+    limit,
+    modalities: openaiTextImageModalities
+  })
   const openaiModels = {
-    'gpt-5.2': {
-      name: 'GPT-5.2',
-      limit: {
-        context: 400000,
-        output: 128000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {},
-        xhigh: {}
-      }
-    },
-    'gpt-5.5': {
-      name: 'GPT-5.5',
-      limit: {
-        context: 1050000,
-        output: 128000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {},
-        xhigh: {}
-      }
-    },
-    'gpt-5.4': {
-      name: 'GPT-5.4',
-      limit: {
-        context: 1050000,
-        output: 128000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {},
-        xhigh: {}
-      }
-    },
-    'gpt-5.4-mini': {
-      name: 'GPT-5.4 Mini',
-      limit: {
-        context: 400000,
-        output: 128000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {},
-        xhigh: {}
-      }
-    },
-    'gpt-5.3-codex-spark': {
-      name: 'GPT-5.3 Codex Spark',
-      limit: {
-        context: 128000,
-        output: 32000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {},
-        xhigh: {}
-      }
-    },
-    'gpt-5.3-codex': {
-      name: 'GPT-5.3 Codex',
-      limit: {
-        context: 400000,
-        output: 128000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {},
-        xhigh: {}
-      }
-    },
-    'codex-mini-latest': {
-      name: 'Codex Mini',
-      limit: {
-        context: 200000,
-        output: 100000
-      },
-      options: {
-        store: false
-      },
-      variants: {
-        low: {},
-        medium: {},
-        high: {}
-      }
-    }
+    'gpt-5.2': openaiModel('GPT-5.2', { context: 400000, output: 128000 }, openaiReasoningVariants),
+    'gpt-5.5': openaiModel('gpt-5.5', { context: 400000, output: 128000 }, openaiReasoningVariants),
+    'gpt-5.4': openaiModel('GPT-5.4', { context: 1050000, output: 128000 }, openaiReasoningVariants),
+    'gpt-5.4-mini': openaiModel('GPT-5.4 Mini', { context: 400000, output: 128000 }, openaiReasoningVariants),
+    'gpt-5.3-codex-spark': openaiModel('GPT-5.3 Codex Spark', { context: 128000, output: 32000 }, openaiReasoningVariants),
+    'gpt-5.3-codex': openaiModel('GPT-5.3 Codex', { context: 400000, output: 128000 }, openaiReasoningVariants),
+    'codex-mini-latest': openaiModel('Codex Mini', { context: 200000, output: 100000 }, openaiCodexMiniVariants)
   }
   const geminiModels = {
     'gemini-2.0-flash': {
