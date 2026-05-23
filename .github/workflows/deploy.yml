@@ -71,18 +71,7 @@ jobs:
             if [ -n "${GHCR_TOKEN:-}" ]; then
               echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             fi
-            printf '%s\n' \
-              'services:' \
-              '  sub2api:' \
-              "    image: ${IMAGE_REF}" \
-              '    environment:' \
-              '      - HTTP_PROXY=${SUB2API_HTTP_PROXY:-}' \
-              '      - HTTPS_PROXY=${SUB2API_HTTPS_PROXY:-}' \
-              '      - NO_PROXY=${SUB2API_NO_PROXY:-localhost,127.0.0.1,postgres,redis,sub2api}' \
-              '      - http_proxy=${SUB2API_HTTP_PROXY:-}' \
-              '      - https_proxy=${SUB2API_HTTPS_PROXY:-}' \
-              '      - no_proxy=${SUB2API_NO_PROXY:-localhost,127.0.0.1,postgres,redis,sub2api}' \
-              > docker-compose.prod.yml
+            printf '%s\n' 'services:' '  sub2api:' "    image: ${IMAGE_REF}" > docker-compose.prod.yml
             docker compose -f docker-compose.yml -f docker-compose.prod.yml config >/dev/null
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull sub2api
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps sub2api
