@@ -5583,6 +5583,29 @@
                 <Toggle v-model="form.payment_enabled" />
               </div>
               <template v-if="form.payment_enabled">
+                <!-- Balance recharge visibility -->
+                <div
+                  class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-600 dark:bg-dark-800/60"
+                >
+                  <div>
+                    <label class="font-medium text-gray-900 dark:text-white">{{
+                      t("admin.settings.payment.balanceRechargeEnabled")
+                    }}</label>
+                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                      {{ t("admin.settings.payment.balanceRechargeEnabledHint") }}
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <span class="text-sm text-gray-500 dark:text-gray-400">
+                      {{ balanceRechargeEnabled ? t("common.enabled") : t("common.disabled") }}
+                    </span>
+                    <Toggle
+                      v-model="balanceRechargeEnabled"
+                      data-testid="payment-balance-recharge-enabled"
+                    />
+                  </div>
+                </div>
+
                 <!-- Row 1: Product name -->
                 <div class="grid grid-cols-3 gap-3">
                   <div>
@@ -7048,6 +7071,13 @@ const form = reactive<SettingsForm>({
 const authSourceDefaults = reactive<AuthSourceDefaultsState>(
   buildAuthSourceDefaultsState({}),
 );
+
+const balanceRechargeEnabled = computed({
+  get: () => !form.payment_balance_disabled,
+  set: (enabled: boolean) => {
+    form.payment_balance_disabled = !enabled;
+  },
+});
 
 const authSourceDefaultsMeta = computed(() => [
   {

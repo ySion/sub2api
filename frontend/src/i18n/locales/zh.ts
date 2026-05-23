@@ -5803,6 +5803,8 @@ export default {
         enabledPaymentTypes: '启用的服务商',
         enabledPaymentTypesHint: '禁用服务商将同时禁用对应的实例。',
         findProvider: '正在寻找合适的易支付服务商？',
+        balanceRechargeEnabled: '按量充值',
+        balanceRechargeEnabledHint: '控制用户侧「充值/订阅」页面是否显示按量充值入口；关闭后仅保留订阅购买入口。',
         minAmount: '最低金额',
         maxAmount: '最高金额',
         dailyLimit: '每日限额',

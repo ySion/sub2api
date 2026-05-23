@@ -5644,6 +5644,8 @@ export default {
         enabledPaymentTypes: 'Enabled Providers',
         enabledPaymentTypesHint: 'Disabling a provider will also disable its instances.',
         findProvider: 'Looking for a suitable EasyPay provider?',
+        balanceRechargeEnabled: 'Usage-based Recharge',
+        balanceRechargeEnabledHint: 'Controls whether the user Recharge / Subscription page shows the usage-based balance recharge entry. When off, only subscription purchase remains.',
         minAmount: 'Minimum Amount',
         maxAmount: 'Maximum Amount',
         dailyLimit: 'Daily Limit',

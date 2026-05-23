@@ -585,6 +585,35 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(payload).not.toHaveProperty("payment_visible_method_wxpay_enabled");
   });
 
+  it("toggles usage-based recharge and submits the backend disable flag", async () => {
+    getSettings.mockResolvedValueOnce({
+      ...baseSettingsResponse,
+      payment_balance_disabled: true,
+    });
+
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openPaymentTab(wrapper);
+
+    const balanceRechargeToggle = wrapper.get(
+      '[data-testid="payment-balance-recharge-enabled"]',
+    );
+    expect((balanceRechargeToggle.element as HTMLInputElement).checked).toBe(
+      false,
+    );
+
+    await balanceRechargeToggle.setValue(true);
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_balance_disabled: false,
+      }),
+    );
+  });
+
   it("submits Anthropic cache TTL injection gateway setting", async () => {
     getSettings.mockResolvedValueOnce({
       ...baseSettingsResponse,
