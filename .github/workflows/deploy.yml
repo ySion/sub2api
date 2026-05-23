@@ -65,18 +65,14 @@ jobs:
           username: ${{ secrets.SSH_USER || 'root' }}
           key: ${{ secrets.SSH_KEY }}
           envs: IMAGE_REF,DEPLOY_DIR,GHCR_USER,GHCR_TOKEN
-          script_stop: true
           script: |
             set -eu
             cd "$DEPLOY_DIR"
             if [ -n "${GHCR_TOKEN:-}" ]; then
               echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
             fi
-            cat > docker-compose.prod.yml <<YAML
-            services:
-              sub2api:
-                image: ${IMAGE_REF}
-            YAML
+            printf '%s\n' 'services:' '  sub2api:' "    image: ${IMAGE_REF}" > docker-compose.prod.yml
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml config >/dev/null
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull sub2api
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-deps sub2api
             docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
