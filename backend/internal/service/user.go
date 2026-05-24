@@ -66,6 +66,23 @@ func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
 }
 
+func (u *User) IsOperator() bool {
+	return u.Role == RoleOperator
+}
+
+func (u *User) IsBackofficeUser() bool {
+	return u.IsAdmin() || u.IsOperator()
+}
+
+func IsValidUserRole(role string) bool {
+	switch role {
+	case RoleAdmin, RoleOperator, RoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
 func (u *User) IsActive() bool {
 	return u.Status == StatusActive
 }

@@ -358,6 +358,7 @@ export default {
     affiliateTransferRecords: 'Transfer Records',
     profile: 'Profile',
     users: 'Users',
+    permissions: 'Permissions',
     groups: 'Groups',
     channels: 'Channels',
     availableChannels: 'Available Channels',
@@ -1148,6 +1149,7 @@ export default {
     securityTitle: 'Security Settings',
     securityDescription: 'Password, two-factor authentication, and alerts live in the right rail.',
     administrator: 'Administrator',
+    operator: 'Operator',
     user: 'User',
     username: 'Username',
     email: 'Email',
@@ -1412,6 +1414,19 @@ export default {
       requestsShort: 'Req',
       tokensShort: 'Tok',
       failedToLoad: 'Failed to load dashboard statistics'
+    },
+
+    permissions: {
+      title: 'Permission Management',
+      description: 'Adjust user backoffice roles. Regular users cannot enter the backoffice; operators only access safe operational pages.',
+      user: 'User',
+      currentRole: 'Current Role',
+      newRole: 'New Role',
+      empty: 'No users found',
+      selfChangeHint: 'You cannot change your own role',
+      loadFailed: 'Failed to load users',
+      saveSuccess: 'Role updated',
+      saveFailed: 'Failed to update role'
     },
 
     backup: {

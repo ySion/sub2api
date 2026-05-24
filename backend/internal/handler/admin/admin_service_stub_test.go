@@ -166,6 +166,11 @@ func (s *stubAdminService) UpdateUser(ctx context.Context, id int64, input *serv
 	return &user, nil
 }
 
+func (s *stubAdminService) UpdateUserRole(ctx context.Context, id int64, role string) (*service.User, error) {
+	user := service.User{ID: id, Email: "updated@example.com", Role: role, Status: service.StatusActive}
+	return &user, nil
+}
+
 func (s *stubAdminService) DeleteUser(ctx context.Context, id int64) error {
 	return nil
 }

@@ -123,6 +123,89 @@ func TestAdminAuthJWTValidatesTokenVersion(t *testing.T) {
 	})
 }
 
+func TestAdminAuthJWTAllowsBackofficeRoles(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: "test-secret", ExpireHour: 1}}
+	authService := service.NewAuthService(nil, nil, nil, nil, cfg, nil, nil, nil, nil, nil, nil, nil)
+
+	currentUser := &service.User{
+		ID:           1,
+		Email:        "user@example.com",
+		Role:         service.RoleUser,
+		Status:       service.StatusActive,
+		TokenVersion: 1,
+		Concurrency:  1,
+	}
+
+	userRepo := &stubUserRepo{
+		getByID: func(ctx context.Context, id int64) (*service.User, error) {
+			if id != currentUser.ID {
+				return nil, service.ErrUserNotFound
+			}
+			clone := *currentUser
+			return &clone, nil
+		},
+	}
+	userService := service.NewUserService(userRepo, nil, nil, nil)
+
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAdminAuthMiddleware(authService, userService, nil)))
+	router.GET("/t", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	for _, tc := range []struct {
+		name       string
+		role       string
+		wantStatus int
+	}{
+		{name: "admin_allowed", role: service.RoleAdmin, wantStatus: http.StatusOK},
+		{name: "operator_allowed", role: service.RoleOperator, wantStatus: http.StatusOK},
+		{name: "user_rejected", role: service.RoleUser, wantStatus: http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			currentUser.Role = tc.role
+
+			token, err := authService.GenerateToken(&service.User{
+				ID:           currentUser.ID,
+				Email:        currentUser.Email,
+				Role:         currentUser.Role,
+				TokenVersion: currentUser.TokenVersion,
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/t", nil)
+			req.Header.Set("Authorization", "Bearer "+token)
+			router.ServeHTTP(w, req)
+
+			require.Equal(t, tc.wantStatus, w.Code)
+		})
+	}
+}
+
+func TestAdminOnlyRejectsOperator(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(string(ContextKeyUserRole), service.RoleOperator)
+		c.Next()
+	})
+	router.Use(AdminOnly())
+	router.GET("/t", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusForbidden, w.Code)
+	require.Contains(t, w.Body.String(), "Admin access required")
+}
+
 type stubUserRepo struct {
 	getByID func(ctx context.Context, id int64) (*service.User, error)
 }

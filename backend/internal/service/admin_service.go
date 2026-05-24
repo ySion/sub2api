@@ -31,6 +31,7 @@ type AdminService interface {
 	GetUser(ctx context.Context, id int64) (*User, error)
 	CreateUser(ctx context.Context, input *CreateUserInput) (*User, error)
 	UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error)
+	UpdateUserRole(ctx context.Context, id int64, role string) (*User, error)
 	DeleteUser(ctx context.Context, id int64) error
 	UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error)
 	BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error)
@@ -797,6 +798,30 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		}
 	}
 
+	return user, nil
+}
+
+func (s *adminServiceImpl) UpdateUserRole(ctx context.Context, id int64, role string) (*User, error) {
+	role = strings.TrimSpace(role)
+	if !IsValidUserRole(role) {
+		return nil, infraerrors.BadRequest("INVALID_USER_ROLE", "invalid user role")
+	}
+
+	user, err := s.userRepo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if user.Role == role {
+		return user, nil
+	}
+
+	user.Role = role
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return nil, err
+	}
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
+	}
 	return user, nil
 }
 

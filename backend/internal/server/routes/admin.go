@@ -16,84 +16,86 @@ func RegisterAdminRoutes(
 ) {
 	admin := v1.Group("/admin")
 	admin.Use(gin.HandlerFunc(adminAuth))
+	adminOnly := admin.Group("")
+	adminOnly.Use(middleware.AdminOnly())
 	{
 		// 仪表盘
 		registerDashboardRoutes(admin, h)
 
 		// 用户管理
-		registerUserManagementRoutes(admin, h)
+		registerUserManagementRoutes(admin, adminOnly, h)
 
 		// 分组管理
-		registerGroupRoutes(admin, h)
+		registerGroupRoutes(admin, adminOnly, h)
 
 		// 账号管理
-		registerAccountRoutes(admin, h)
+		registerAccountRoutes(adminOnly, h)
 
 		// 公告管理
 		registerAnnouncementRoutes(admin, h)
 
 		// OpenAI OAuth
-		registerOpenAIOAuthRoutes(admin, h)
+		registerOpenAIOAuthRoutes(adminOnly, h)
 
 		// Gemini OAuth
-		registerGeminiOAuthRoutes(admin, h)
+		registerGeminiOAuthRoutes(adminOnly, h)
 
 		// Antigravity OAuth
-		registerAntigravityOAuthRoutes(admin, h)
+		registerAntigravityOAuthRoutes(adminOnly, h)
 
 		// 代理管理
-		registerProxyRoutes(admin, h)
+		registerProxyRoutes(adminOnly, h)
 
 		// 卡密管理
-		registerRedeemCodeRoutes(admin, h)
+		registerRedeemCodeRoutes(adminOnly, h)
 
 		// 优惠码管理
 		registerPromoCodeRoutes(admin, h)
 
 		// 系统设置
-		registerSettingsRoutes(admin, h)
+		registerSettingsRoutes(adminOnly, h)
 
 		// 数据管理
-		registerDataManagementRoutes(admin, h)
+		registerDataManagementRoutes(adminOnly, h)
 
 		// 数据库备份恢复
-		registerBackupRoutes(admin, h)
+		registerBackupRoutes(adminOnly, h)
 
 		// 运维监控（Ops）
-		registerOpsRoutes(admin, h)
+		registerOpsRoutes(adminOnly, h)
 
 		// 系统管理
-		registerSystemRoutes(admin, h)
+		registerSystemRoutes(adminOnly, h)
 
 		// 订阅管理
-		registerSubscriptionRoutes(admin, h)
+		registerSubscriptionRoutes(admin, adminOnly, h)
 
 		// 使用记录管理
-		registerUsageRoutes(admin, h)
+		registerUsageRoutes(admin, adminOnly, h)
 
 		// 用户属性管理
-		registerUserAttributeRoutes(admin, h)
+		registerUserAttributeRoutes(adminOnly, h)
 
 		// 错误透传规则管理
-		registerErrorPassthroughRoutes(admin, h)
+		registerErrorPassthroughRoutes(adminOnly, h)
 
 		// TLS 指纹模板管理
-		registerTLSFingerprintProfileRoutes(admin, h)
+		registerTLSFingerprintProfileRoutes(adminOnly, h)
 
 		// API Key 管理
-		registerAdminAPIKeyRoutes(admin, h)
+		registerAdminAPIKeyRoutes(adminOnly, h)
 
 		// 定时测试计划
-		registerScheduledTestRoutes(admin, h)
+		registerScheduledTestRoutes(adminOnly, h)
 
 		// 渠道管理
-		registerChannelRoutes(admin, h)
+		registerChannelRoutes(adminOnly, h)
 
 		// 渠道监控
-		registerChannelMonitorRoutes(admin, h)
+		registerChannelMonitorRoutes(adminOnly, h)
 
 		// 风控中心
-		registerContentModerationRoutes(admin, h)
+		registerContentModerationRoutes(adminOnly, h)
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
@@ -225,48 +227,55 @@ func registerDashboardRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerUserManagementRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *handler.Handlers) {
 	users := admin.Group("/users")
+	usersAdminOnly := adminOnly.Group("/users")
 	{
 		users.GET("", h.Admin.User.List)
 		users.GET("/:id", h.Admin.User.GetByID)
-		users.POST("/:id/auth-identities", h.Admin.User.BindAuthIdentity)
-		users.POST("", h.Admin.User.Create)
-		users.PUT("/:id", h.Admin.User.Update)
-		users.DELETE("/:id", h.Admin.User.Delete)
-		users.POST("/:id/balance", h.Admin.User.UpdateBalance)
-		users.GET("/:id/api-keys", h.Admin.User.GetUserAPIKeys)
 		users.GET("/:id/usage", h.Admin.User.GetUserUsage)
 		users.GET("/:id/balance-history", h.Admin.User.GetBalanceHistory)
-		users.POST("/:id/replace-group", h.Admin.User.ReplaceGroup)
 		users.GET("/:id/rpm-status", h.Admin.User.GetUserRPMStatus)
-		users.POST("/batch-concurrency", h.Admin.User.BatchUpdateConcurrency)
+
+		// 权限、密钥和额度变更仅限管理员。
+		usersAdminOnly.POST("/:id/auth-identities", h.Admin.User.BindAuthIdentity)
+		usersAdminOnly.POST("", h.Admin.User.Create)
+		usersAdminOnly.PUT("/:id/role", h.Admin.User.UpdateRole)
+		usersAdminOnly.PUT("/:id", h.Admin.User.Update)
+		usersAdminOnly.DELETE("/:id", h.Admin.User.Delete)
+		usersAdminOnly.POST("/:id/balance", h.Admin.User.UpdateBalance)
+		usersAdminOnly.GET("/:id/api-keys", h.Admin.User.GetUserAPIKeys)
+		usersAdminOnly.POST("/:id/replace-group", h.Admin.User.ReplaceGroup)
+		usersAdminOnly.POST("/batch-concurrency", h.Admin.User.BatchUpdateConcurrency)
 
 		// User attribute values
-		users.GET("/:id/attributes", h.Admin.UserAttribute.GetUserAttributes)
-		users.PUT("/:id/attributes", h.Admin.UserAttribute.UpdateUserAttributes)
+		usersAdminOnly.GET("/:id/attributes", h.Admin.UserAttribute.GetUserAttributes)
+		usersAdminOnly.PUT("/:id/attributes", h.Admin.UserAttribute.UpdateUserAttributes)
 	}
 }
 
-func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerGroupRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *handler.Handlers) {
 	groups := admin.Group("/groups")
+	groupsAdminOnly := adminOnly.Group("/groups")
 	{
 		groups.GET("", h.Admin.Group.List)
 		groups.GET("/all", h.Admin.Group.GetAll)
 		groups.GET("/usage-summary", h.Admin.Group.GetUsageSummary)
 		groups.GET("/capacity-summary", h.Admin.Group.GetCapacitySummary)
-		groups.PUT("/sort-order", h.Admin.Group.UpdateSortOrder)
 		groups.GET("/:id", h.Admin.Group.GetByID)
-		groups.POST("", h.Admin.Group.Create)
-		groups.PUT("/:id", h.Admin.Group.Update)
-		groups.DELETE("/:id", h.Admin.Group.Delete)
 		groups.GET("/:id/stats", h.Admin.Group.GetStats)
-		groups.GET("/:id/rate-multipliers", h.Admin.Group.GetGroupRateMultipliers)
-		groups.PUT("/:id/rate-multipliers", h.Admin.Group.BatchSetGroupRateMultipliers)
-		groups.DELETE("/:id/rate-multipliers", h.Admin.Group.ClearGroupRateMultipliers)
-		groups.PUT("/:id/rpm-overrides", h.Admin.Group.BatchSetGroupRPMOverrides)
-		groups.DELETE("/:id/rpm-overrides", h.Admin.Group.ClearGroupRPMOverrides)
-		groups.GET("/:id/api-keys", h.Admin.Group.GetGroupAPIKeys)
+
+		// 权限、倍率、RPM 和密钥关联仅限管理员。
+		groupsAdminOnly.PUT("/sort-order", h.Admin.Group.UpdateSortOrder)
+		groupsAdminOnly.POST("", h.Admin.Group.Create)
+		groupsAdminOnly.PUT("/:id", h.Admin.Group.Update)
+		groupsAdminOnly.DELETE("/:id", h.Admin.Group.Delete)
+		groupsAdminOnly.GET("/:id/rate-multipliers", h.Admin.Group.GetGroupRateMultipliers)
+		groupsAdminOnly.PUT("/:id/rate-multipliers", h.Admin.Group.BatchSetGroupRateMultipliers)
+		groupsAdminOnly.DELETE("/:id/rate-multipliers", h.Admin.Group.ClearGroupRateMultipliers)
+		groupsAdminOnly.PUT("/:id/rpm-overrides", h.Admin.Group.BatchSetGroupRPMOverrides)
+		groupsAdminOnly.DELETE("/:id/rpm-overrides", h.Admin.Group.ClearGroupRPMOverrides)
+		groupsAdminOnly.GET("/:id/api-keys", h.Admin.Group.GetGroupAPIKeys)
 	}
 }
 
@@ -507,17 +516,20 @@ func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerSubscriptionRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *handler.Handlers) {
 	subscriptions := admin.Group("/subscriptions")
+	subscriptionsAdminOnly := adminOnly.Group("/subscriptions")
 	{
 		subscriptions.GET("", h.Admin.Subscription.List)
 		subscriptions.GET("/:id", h.Admin.Subscription.GetByID)
 		subscriptions.GET("/:id/progress", h.Admin.Subscription.GetProgress)
-		subscriptions.POST("/assign", h.Admin.Subscription.Assign)
-		subscriptions.POST("/bulk-assign", h.Admin.Subscription.BulkAssign)
-		subscriptions.POST("/:id/extend", h.Admin.Subscription.Extend)
-		subscriptions.POST("/:id/reset-quota", h.Admin.Subscription.ResetQuota)
-		subscriptions.DELETE("/:id", h.Admin.Subscription.Revoke)
+
+		// 订阅发放、延期、重置和撤销会改变用户权益，仅限管理员。
+		subscriptionsAdminOnly.POST("/assign", h.Admin.Subscription.Assign)
+		subscriptionsAdminOnly.POST("/bulk-assign", h.Admin.Subscription.BulkAssign)
+		subscriptionsAdminOnly.POST("/:id/extend", h.Admin.Subscription.Extend)
+		subscriptionsAdminOnly.POST("/:id/reset-quota", h.Admin.Subscription.ResetQuota)
+		subscriptionsAdminOnly.DELETE("/:id", h.Admin.Subscription.Revoke)
 	}
 
 	// 分组下的订阅列表
@@ -527,16 +539,19 @@ func registerSubscriptionRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	admin.GET("/users/:id/subscriptions", h.Admin.Subscription.ListByUser)
 }
 
-func registerUsageRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerUsageRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *handler.Handlers) {
 	usage := admin.Group("/usage")
+	usageAdminOnly := adminOnly.Group("/usage")
 	{
 		usage.GET("", h.Admin.Usage.List)
 		usage.GET("/stats", h.Admin.Usage.Stats)
 		usage.GET("/search-users", h.Admin.Usage.SearchUsers)
 		usage.GET("/search-api-keys", h.Admin.Usage.SearchAPIKeys)
-		usage.GET("/cleanup-tasks", h.Admin.Usage.ListCleanupTasks)
-		usage.POST("/cleanup-tasks", h.Admin.Usage.CreateCleanupTask)
-		usage.POST("/cleanup-tasks/:id/cancel", h.Admin.Usage.CancelCleanupTask)
+
+		// 清理任务属于数据管理操作，仅限管理员。
+		usageAdminOnly.GET("/cleanup-tasks", h.Admin.Usage.ListCleanupTasks)
+		usageAdminOnly.POST("/cleanup-tasks", h.Admin.Usage.CreateCleanupTask)
+		usageAdminOnly.POST("/cleanup-tasks/:id/cancel", h.Admin.Usage.CancelCleanupTask)
 	}
 }
 

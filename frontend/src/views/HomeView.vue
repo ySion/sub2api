@@ -437,8 +437,8 @@ const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
 
 // Auth state
 const isAuthenticated = computed(() => authStore.isAuthenticated)
-const isAdmin = computed(() => authStore.isAdmin)
-const dashboardPath = computed(() => isAdmin.value ? '/admin/dashboard' : '/dashboard')
+const isBackoffice = computed(() => authStore.isBackoffice)
+const dashboardPath = computed(() => isBackoffice.value ? '/admin/dashboard' : '/dashboard')
 const userInitial = computed(() => {
   const user = authStore.user
   if (!user || !user.email) return ''

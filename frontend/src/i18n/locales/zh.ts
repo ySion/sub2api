@@ -358,6 +358,7 @@ export default {
     affiliateTransferRecords: '提取记录',
     profile: '个人资料',
     users: '用户管理',
+    permissions: '权限管理',
     groups: '分组管理',
     channels: '渠道管理',
     availableChannels: '可用渠道',
@@ -1152,6 +1153,7 @@ export default {
     securityTitle: '安全设置',
     securityDescription: '密码、双因素认证和通知提醒集中放在右侧。',
     administrator: '管理员',
+    operator: '运营员',
     user: '用户',
     username: '用户名',
     email: '邮箱',
@@ -1433,6 +1435,19 @@ export default {
       systemSettings: '系统设置',
       configureSystem: '配置系统设置',
       failedToLoad: '加载仪表盘数据失败'
+    },
+
+    permissions: {
+      title: '权限管理',
+      description: '调整用户的后台角色。普通用户不能进入后台，运营员只能访问安全的运营页面。',
+      user: '用户',
+      currentRole: '当前角色',
+      newRole: '新角色',
+      empty: '暂无用户',
+      selfChangeHint: '不能修改自己的角色',
+      loadFailed: '加载用户列表失败',
+      saveSuccess: '角色已更新',
+      saveFailed: '角色更新失败'
     },
 
     backup: {

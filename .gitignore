@@ -136,3 +136,6 @@ docs/*
 frontend/coverage/
 aicodex
 output/
+
+# 本地计划文档（不提交）
+plandoc/

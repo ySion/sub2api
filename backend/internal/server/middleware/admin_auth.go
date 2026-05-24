@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// NewAdminAuthMiddleware 创建管理员认证中间件
+// NewAdminAuthMiddleware 创建后台认证中间件
 func NewAdminAuthMiddleware(
 	authService *service.AuthService,
 	userService *service.UserService,
@@ -20,10 +20,10 @@ func NewAdminAuthMiddleware(
 	return AdminAuthMiddleware(adminAuth(authService, userService, settingService))
 }
 
-// adminAuth 管理员认证中间件实现
+// adminAuth 后台认证中间件实现
 // 支持两种认证方式（通过不同的 header 区分）：
 // 1. Admin API Key: x-api-key: <admin-api-key>
-// 2. JWT Token: Authorization: Bearer <jwt-token> (需要管理员角色)
+// 2. JWT Token: Authorization: Bearer <jwt-token> (需要 admin/operator 后台角色)
 func adminAuth(
 	authService *service.AuthService,
 	userService *service.UserService,
@@ -150,7 +150,7 @@ func validateAdminAPIKey(
 	return true
 }
 
-// validateJWTForAdmin 验证 JWT 并检查管理员权限
+// validateJWTForAdmin 验证 JWT 并检查后台访问权限
 func validateJWTForAdmin(
 	c *gin.Context,
 	token string,
@@ -187,9 +187,9 @@ func validateJWTForAdmin(
 		return false
 	}
 
-	// 检查管理员权限
-	if !user.IsAdmin() {
-		AbortWithError(c, 403, "FORBIDDEN", "Admin access required")
+	// 检查后台访问权限
+	if !user.IsBackofficeUser() {
+		AbortWithError(c, 403, "FORBIDDEN", "Backoffice access required")
 		return false
 	}
 

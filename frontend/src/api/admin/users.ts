@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from '../client'
-import type { AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey } from '@/types'
+import type { AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey, UserRole } from '@/types'
 
 export interface AdminBindAuthIdentityChannelRequest {
   channel: string
@@ -57,7 +57,7 @@ export async function list(
   pageSize: number = 20,
   filters?: {
     status?: 'active' | 'disabled'
-    role?: 'admin' | 'user'
+    role?: UserRole
     search?: string
     group_name?: string         // fuzzy filter by allowed group name
     attributes?: Record<number, string>  // attributeId -> value
@@ -131,6 +131,11 @@ export async function create(userData: {
  */
 export async function update(id: number, updates: UpdateUserRequest): Promise<AdminUser> {
   const { data } = await apiClient.put<AdminUser>(`/admin/users/${id}`, updates)
+  return data
+}
+
+export async function updateRole(id: number, role: UserRole): Promise<AdminUser> {
+  const { data } = await apiClient.put<AdminUser>(`/admin/users/${id}/role`, { role })
   return data
 }
 
@@ -302,6 +307,7 @@ export const usersAPI = {
   getById,
   create,
   update,
+  updateRole,
   delete: deleteUser,
   updateBalance,
   updateConcurrency,

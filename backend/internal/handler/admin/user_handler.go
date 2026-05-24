@@ -7,6 +7,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -59,6 +60,10 @@ type UpdateUserRequest struct {
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率
 	GroupRates map[int64]*float64 `json:"group_rates"`
+}
+
+type UpdateUserRoleRequest struct {
+	Role string `json:"role" binding:"required,oneof=admin operator user"`
 }
 
 // UpdateBalanceRequest represents balance update request
@@ -284,6 +289,40 @@ func (h *UserHandler) Update(c *gin.Context) {
 		AllowedGroups: req.AllowedGroups,
 		GroupRates:    req.GroupRates,
 	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, dto.UserFromServiceAdmin(user))
+}
+
+// UpdateRole handles changing a user's backoffice role.
+// PUT /api/v1/admin/users/:id/role
+func (h *UserHandler) UpdateRole(c *gin.Context) {
+	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid user ID")
+		return
+	}
+
+	subject, ok := middleware.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Forbidden(c, "Authenticated admin context required")
+		return
+	}
+	if subject.UserID == userID {
+		response.Forbidden(c, "Cannot change your own role")
+		return
+	}
+
+	var req UpdateUserRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	user, err := h.adminService.UpdateUserRole(c.Request.Context(), userID, req.Role)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

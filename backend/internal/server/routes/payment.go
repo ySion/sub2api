@@ -65,16 +65,18 @@ func RegisterPaymentRoutes(
 		webhook.POST("/airwallex", webhookHandler.AirwallexWebhook)
 	}
 
-	// --- Admin payment endpoints (admin auth) ---
+	// --- Admin payment endpoints (backoffice auth; secrets remain admin-only) ---
 	adminGroup := v1.Group("/admin/payment")
 	adminGroup.Use(gin.HandlerFunc(adminAuth))
+	adminOnly := adminGroup.Group("")
+	adminOnly.Use(middleware.AdminOnly())
 	{
 		// Dashboard
 		adminGroup.GET("/dashboard", adminPaymentHandler.GetDashboard)
 
 		// Config
-		adminGroup.GET("/config", adminPaymentHandler.GetConfig)
-		adminGroup.PUT("/config", adminPaymentHandler.UpdateConfig)
+		adminOnly.GET("/config", adminPaymentHandler.GetConfig)
+		adminOnly.PUT("/config", adminPaymentHandler.UpdateConfig)
 
 		// Orders
 		adminOrders := adminGroup.Group("/orders")
@@ -88,15 +90,16 @@ func RegisterPaymentRoutes(
 
 		// Subscription Plans
 		plans := adminGroup.Group("/plans")
+		plansAdminOnly := adminOnly.Group("/plans")
 		{
 			plans.GET("", adminPaymentHandler.ListPlans)
-			plans.POST("", adminPaymentHandler.CreatePlan)
-			plans.PUT("/:id", adminPaymentHandler.UpdatePlan)
-			plans.DELETE("/:id", adminPaymentHandler.DeletePlan)
+			plansAdminOnly.POST("", adminPaymentHandler.CreatePlan)
+			plansAdminOnly.PUT("/:id", adminPaymentHandler.UpdatePlan)
+			plansAdminOnly.DELETE("/:id", adminPaymentHandler.DeletePlan)
 		}
 
 		// Provider Instances
-		providers := adminGroup.Group("/providers")
+		providers := adminOnly.Group("/providers")
 		{
 			providers.GET("", adminPaymentHandler.ListProviders)
 			providers.POST("", adminPaymentHandler.CreateProvider)

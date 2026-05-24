@@ -7,7 +7,7 @@ import (
 )
 
 // AdminOnly 管理员权限中间件
-// 必须在JWTAuth中间件之后使用
+// 必须在认证中间件之后使用
 func AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, ok := GetUserRoleFromContext(c)
