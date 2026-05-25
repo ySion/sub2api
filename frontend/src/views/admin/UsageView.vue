@@ -64,7 +64,7 @@
           <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
         </div>
       </div>
-      <UsageFilters v-model="filters" :start-date="startDate" :end-date="endDate" :exporting="exporting" :show-cleanup="canUseSensitiveUsageControls" :show-api-key-filter="canUseSensitiveUsageControls" :show-account-filter="canUseSensitiveUsageControls" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
+      <UsageFilters v-model="filters" :start-date="startDate" :end-date="endDate" :exporting="exporting" :show-cleanup="canUseSensitiveUsageControls" :show-export="canUseSensitiveUsageControls" :show-api-key-filter="canUseSensitiveUsageControls" :show-account-filter="canUseSensitiveUsageControls" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
         <template #after-reset>
           <div class="relative" ref="columnDropdownRef">
             <button
@@ -463,6 +463,8 @@ const getRequestTypeLabel = (log: AdminUsageLog): string => {
 }
 
 const exportToExcel = async () => {
+  if (!canUseSensitiveUsageControls.value) return
+
   if (exporting.value) return; exporting.value = true; exportProgress.show = true
   const c = new AbortController(); exportAbortController = c
   try {

@@ -159,7 +159,7 @@
         <button v-if="showCleanup" type="button" @click="$emit('cleanup')" class="btn btn-danger">
           {{ t('admin.usage.cleanup.button') }}
         </button>
-        <button type="button" @click="$emit('export')" :disabled="exporting" class="btn btn-primary">
+        <button v-if="showExport" type="button" @click="$emit('export')" :disabled="exporting" class="btn btn-primary">
           {{ t('usage.exportExcel') }}
         </button>
       </div>
@@ -183,6 +183,7 @@ interface Props {
   endDate: string
   showActions?: boolean
   showCleanup?: boolean
+  showExport?: boolean
   showApiKeyFilter?: boolean
   showAccountFilter?: boolean
 }
@@ -190,6 +191,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   showActions: true,
   showCleanup: true,
+  showExport: true,
   showApiKeyFilter: true,
   showAccountFilter: true
 })

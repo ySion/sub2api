@@ -81,6 +81,9 @@ func TestAdminPermissionRoutesRejectOperatorOnSensitiveRoutes(t *testing.T) {
 		{name: "redeem_codes_batch_update", method: http.MethodPost, path: "/api/v1/admin/redeem-codes/batch-update"},
 		{name: "usage_search_api_keys", method: http.MethodGet, path: "/api/v1/admin/usage/search-api-keys"},
 		{name: "affiliate_user_config", method: http.MethodGet, path: "/api/v1/admin/affiliates/users"},
+		{name: "promo_codes_create", method: http.MethodPost, path: "/api/v1/admin/promo-codes"},
+		{name: "promo_codes_update", method: http.MethodPut, path: "/api/v1/admin/promo-codes/1"},
+		{name: "promo_codes_delete", method: http.MethodDelete, path: "/api/v1/admin/promo-codes/1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := &adminPermissionRouteService{}
@@ -94,6 +97,44 @@ func TestAdminPermissionRoutesRejectOperatorOnSensitiveRoutes(t *testing.T) {
 			require.False(t, svc.listAccountsCalled)
 			require.False(t, svc.listProxiesCalled)
 			require.False(t, svc.listRedeemCodesCalled)
+		})
+	}
+}
+
+func TestPaymentOrderMutationRoutesRejectOperator(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tc := range []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{name: "cancel", method: http.MethodPost, path: "/api/v1/admin/payment/orders/1/cancel"},
+		{name: "retry", method: http.MethodPost, path: "/api/v1/admin/payment/orders/1/retry"},
+		{name: "refund", method: http.MethodPost, path: "/api/v1/admin/payment/orders/1/refund"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			router := gin.New()
+			adminGroup := router.Group("/api/v1/admin/payment")
+			adminGroup.Use(func(c *gin.Context) {
+				c.Set(string(middleware.ContextKeyUserRole), service.RoleOperator)
+				c.Next()
+			})
+			adminOnly := adminGroup.Group("")
+			adminOnly.Use(middleware.AdminOnly())
+
+			ordersAdminOnly := adminOnly.Group("/orders")
+			ordersAdminOnly.POST("/:id/cancel", func(c *gin.Context) { called = true })
+			ordersAdminOnly.POST("/:id/retry", func(c *gin.Context) { called = true })
+			ordersAdminOnly.POST("/:id/refund", func(c *gin.Context) { called = true })
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			router.ServeHTTP(w, req)
+
+			require.Equal(t, http.StatusForbidden, w.Code)
+			require.False(t, called)
 		})
 	}
 }
@@ -154,6 +195,7 @@ func newAdminPermissionRouteRouter(role string, svc *adminPermissionRouteService
 			Announcement:  adminhandler.NewAnnouncementHandler(service.NewAnnouncementService(&adminPermissionAnnouncementRepo{}, nil, nil, nil)),
 			Proxy:         adminhandler.NewProxyHandler(svc),
 			Redeem:        adminhandler.NewRedeemHandler(svc, nil),
+			Promo:         adminhandler.NewPromoHandler(nil),
 			Setting:       adminhandler.NewSettingHandler(nil, nil, nil, nil, nil, nil, nil),
 			Usage:         adminhandler.NewUsageHandler(nil, nil, svc, nil),
 			UserAttribute: adminhandler.NewUserAttributeHandler(nil),
@@ -166,6 +208,7 @@ func newAdminPermissionRouteRouter(role string, svc *adminPermissionRouteService
 	registerGroupRoutes(admin, adminOnly, h)
 	registerAccountRoutes(adminOnly, h)
 	registerRedeemCodeRoutes(admin, adminOnly, h)
+	registerPromoCodeRoutes(admin, adminOnly, h)
 	registerProxyRoutes(adminOnly, h)
 	registerSettingsRoutes(adminOnly, h)
 	registerUsageRoutes(admin, adminOnly, h)

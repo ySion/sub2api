@@ -80,12 +80,15 @@ func RegisterPaymentRoutes(
 
 		// Orders
 		adminOrders := adminGroup.Group("/orders")
+		adminOrdersAdminOnly := adminOnly.Group("/orders")
 		{
 			adminOrders.GET("", adminPaymentHandler.ListOrders)
 			adminOrders.GET("/:id", adminPaymentHandler.GetOrderDetail)
-			adminOrders.POST("/:id/cancel", adminPaymentHandler.CancelOrder)
-			adminOrders.POST("/:id/retry", adminPaymentHandler.RetryFulfillment)
-			adminOrders.POST("/:id/refund", adminPaymentHandler.ProcessRefund)
+
+			// 订单取消、重试和退款会改变资金/权益状态，仅限管理员。
+			adminOrdersAdminOnly.POST("/:id/cancel", adminPaymentHandler.CancelOrder)
+			adminOrdersAdminOnly.POST("/:id/retry", adminPaymentHandler.RetryFulfillment)
+			adminOrdersAdminOnly.POST("/:id/refund", adminPaymentHandler.ProcessRefund)
 		}
 
 		// Subscription Plans

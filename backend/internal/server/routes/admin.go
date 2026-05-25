@@ -50,7 +50,7 @@ func RegisterAdminRoutes(
 		registerRedeemCodeRoutes(admin, adminOnly, h)
 
 		// 优惠码管理
-		registerPromoCodeRoutes(admin, h)
+		registerPromoCodeRoutes(admin, adminOnly, h)
 
 		// 系统设置
 		registerSettingsRoutes(adminOnly, h)
@@ -411,15 +411,18 @@ func registerRedeemCodeRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup
 	}
 }
 
-func registerPromoCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerPromoCodeRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *handler.Handlers) {
 	promoCodes := admin.Group("/promo-codes")
+	promoCodesAdminOnly := adminOnly.Group("/promo-codes")
 	{
 		promoCodes.GET("", h.Admin.Promo.List)
 		promoCodes.GET("/:id", h.Admin.Promo.GetByID)
-		promoCodes.POST("", h.Admin.Promo.Create)
-		promoCodes.PUT("/:id", h.Admin.Promo.Update)
-		promoCodes.DELETE("/:id", h.Admin.Promo.Delete)
 		promoCodes.GET("/:id/usages", h.Admin.Promo.GetUsages)
+
+		// 优惠码创建、修改和删除会改变用户权益，仅限管理员。
+		promoCodesAdminOnly.POST("", h.Admin.Promo.Create)
+		promoCodesAdminOnly.PUT("/:id", h.Admin.Promo.Update)
+		promoCodesAdminOnly.DELETE("/:id", h.Admin.Promo.Delete)
 	}
 }
 

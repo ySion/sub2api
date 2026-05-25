@@ -19,7 +19,7 @@
               <input
                 v-model="filterUserKeyword"
                 type="text"
-                :placeholder="t('admin.users.searchUsers')"
+                :placeholder="userSearchPlaceholder"
                 class="input pl-10 pr-8"
                 @input="debounceSearchFilterUsers"
                 @focus="showFilterUserDropdown = true"
@@ -766,6 +766,9 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const canManageSubscriptions = computed(() => authStore.isAdmin)
+const userSearchPlaceholder = computed(() =>
+  canManageSubscriptions.value ? t('admin.users.searchUsers') : t('admin.users.searchUsersBasic')
+)
 
 interface GroupOption {
   value: number

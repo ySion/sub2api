@@ -16,7 +16,7 @@
               <input
                 v-model="searchQuery"
                 type="text"
-                :placeholder="t('admin.users.searchUsers')"
+                :placeholder="userSearchPlaceholder"
                 class="input pl-10"
                 @input="handleSearch"
               />
@@ -753,6 +753,9 @@ import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const canManageUsers = computed(() => authStore.isAdmin)
+const userSearchPlaceholder = computed(() =>
+  canManageUsers.value ? t('admin.users.searchUsers') : t('admin.users.searchUsersBasic')
+)
 
 // Generate dynamic attribute columns from enabled definitions
 const attributeColumns = computed<Column[]>(() =>

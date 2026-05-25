@@ -1770,6 +1770,7 @@ export default {
       editUser: 'Edit User',
       deleteUser: 'Delete User',
       searchUsers: 'Search by email, username, notes, or API key...',
+      searchUsersBasic: 'Search by email or username...',
       allRoles: 'All Roles',
       allStatus: 'All Status',
       allGroups: 'All Groups',
