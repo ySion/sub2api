@@ -305,7 +305,11 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		payload.OpenAIFastPolicySettings = openaiFastPolicySettingsToDTO(fastPolicy)
 	}
 
-	response.Success(c, systemSettingsResponseData(payload, authSourceDefaults))
+	data := systemSettingsResponseData(payload, authSourceDefaults)
+	if isOperatorBackofficeRequest(c) {
+		data = operatorSettingsResponseData(data)
+	}
+	response.Success(c, data)
 }
 
 // openaiFastPolicySettingsToDTO converts service -> dto for OpenAI fast policy.
@@ -639,6 +643,445 @@ type UpdateSettingsRequest struct {
 	OpenAIFastPolicySettings *dto.OpenAIFastPolicySettings `json:"openai_fast_policy_settings,omitempty"`
 }
 
+func settingsBoolPtr(v bool) *bool {
+	return &v
+}
+
+func settingsIntPtr(v int) *int {
+	return &v
+}
+
+func settingsFloat64Ptr(v float64) *float64 {
+	return &v
+}
+
+func settingsStringPtr(v string) *string {
+	return &v
+}
+
+func dtoDefaultSubscriptionSettingsFromService(items []service.DefaultSubscriptionSetting) []dto.DefaultSubscriptionSetting {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]dto.DefaultSubscriptionSetting, 0, len(items))
+	for _, item := range items {
+		out = append(out, dto.DefaultSubscriptionSetting{
+			GroupID:      item.GroupID,
+			ValidityDays: item.ValidityDays,
+		})
+	}
+	return out
+}
+
+func dtoDefaultSubscriptionSettingsPtrFromService(items []service.DefaultSubscriptionSetting) *[]dto.DefaultSubscriptionSetting {
+	out := dtoDefaultSubscriptionSettingsFromService(items)
+	return &out
+}
+
+func settingsUpdateRequestFromExisting(settings *service.SystemSettings, authSourceDefaults *service.AuthSourceDefaultSettings) UpdateSettingsRequest {
+	if settings == nil {
+		settings = &service.SystemSettings{}
+	}
+	if authSourceDefaults == nil {
+		authSourceDefaults = &service.AuthSourceDefaultSettings{}
+	}
+	customMenuItems := dto.ParseCustomMenuItems(settings.CustomMenuItems)
+	customEndpoints := dto.ParseCustomEndpoints(settings.CustomEndpoints)
+
+	req := UpdateSettingsRequest{
+		RegistrationEnabled:              settings.RegistrationEnabled,
+		EmailVerifyEnabled:               settings.EmailVerifyEnabled,
+		RegistrationEmailSuffixWhitelist: settings.RegistrationEmailSuffixWhitelist,
+		PromoCodeEnabled:                 settings.PromoCodeEnabled,
+		PasswordResetEnabled:             settings.PasswordResetEnabled,
+		FrontendURL:                      settings.FrontendURL,
+		InvitationCodeEnabled:            settings.InvitationCodeEnabled,
+		TotpEnabled:                      settings.TotpEnabled,
+		LoginAgreementEnabled:            settings.LoginAgreementEnabled,
+		LoginAgreementMode:               settings.LoginAgreementMode,
+		LoginAgreementUpdatedAt:          settings.LoginAgreementUpdatedAt,
+		LoginAgreementDocuments:          loginAgreementDocumentsToDTO(settings.LoginAgreementDocuments),
+
+		SMTPHost:     settings.SMTPHost,
+		SMTPPort:     settings.SMTPPort,
+		SMTPUsername: settings.SMTPUsername,
+		SMTPPassword: settings.SMTPPassword,
+		SMTPFrom:     settings.SMTPFrom,
+		SMTPFromName: settings.SMTPFromName,
+		SMTPUseTLS:   settings.SMTPUseTLS,
+
+		TurnstileEnabled:           settings.TurnstileEnabled,
+		TurnstileSiteKey:           settings.TurnstileSiteKey,
+		TurnstileSecretKey:         settings.TurnstileSecretKey,
+		APIKeyACLTrustForwardedIP:  settingsBoolPtr(settings.APIKeyACLTrustForwardedIP),
+		LinuxDoConnectEnabled:      settings.LinuxDoConnectEnabled,
+		LinuxDoConnectClientID:     settings.LinuxDoConnectClientID,
+		LinuxDoConnectClientSecret: settings.LinuxDoConnectClientSecret,
+		LinuxDoConnectRedirectURL:  settings.LinuxDoConnectRedirectURL,
+
+		DingTalkConnectEnabled:                 settings.DingTalkConnectEnabled,
+		DingTalkConnectClientID:                settings.DingTalkConnectClientID,
+		DingTalkConnectClientSecret:            settings.DingTalkConnectClientSecret,
+		DingTalkConnectRedirectURL:             settings.DingTalkConnectRedirectURL,
+		DingTalkConnectCorpRestrictionPolicy:   settings.DingTalkConnectCorpRestrictionPolicy,
+		DingTalkConnectInternalCorpID:          settings.DingTalkConnectInternalCorpID,
+		DingTalkConnectBypassRegistration:      settings.DingTalkConnectBypassRegistration,
+		DingTalkConnectSyncCorpEmail:           settings.DingTalkConnectSyncCorpEmail,
+		DingTalkConnectSyncDisplayName:         settings.DingTalkConnectSyncDisplayName,
+		DingTalkConnectSyncDept:                settings.DingTalkConnectSyncDept,
+		DingTalkConnectSyncCorpEmailAttrKey:    settings.DingTalkConnectSyncCorpEmailAttrKey,
+		DingTalkConnectSyncDisplayNameAttrKey:  settings.DingTalkConnectSyncDisplayNameAttrKey,
+		DingTalkConnectSyncDeptAttrKey:         settings.DingTalkConnectSyncDeptAttrKey,
+		DingTalkConnectSyncCorpEmailAttrName:   settings.DingTalkConnectSyncCorpEmailAttrName,
+		DingTalkConnectSyncDisplayNameAttrName: settings.DingTalkConnectSyncDisplayNameAttrName,
+		DingTalkConnectSyncDeptAttrName:        settings.DingTalkConnectSyncDeptAttrName,
+
+		WeChatConnectEnabled:             settings.WeChatConnectEnabled,
+		WeChatConnectAppID:               settings.WeChatConnectAppID,
+		WeChatConnectAppSecret:           settings.WeChatConnectAppSecret,
+		WeChatConnectOpenAppID:           settings.WeChatConnectOpenAppID,
+		WeChatConnectOpenAppSecret:       settings.WeChatConnectOpenAppSecret,
+		WeChatConnectMPAppID:             settings.WeChatConnectMPAppID,
+		WeChatConnectMPAppSecret:         settings.WeChatConnectMPAppSecret,
+		WeChatConnectMobileAppID:         settings.WeChatConnectMobileAppID,
+		WeChatConnectMobileAppSecret:     settings.WeChatConnectMobileAppSecret,
+		WeChatConnectOpenEnabled:         settings.WeChatConnectOpenEnabled,
+		WeChatConnectMPEnabled:           settings.WeChatConnectMPEnabled,
+		WeChatConnectMobileEnabled:       settings.WeChatConnectMobileEnabled,
+		WeChatConnectMode:                settings.WeChatConnectMode,
+		WeChatConnectScopes:              settings.WeChatConnectScopes,
+		WeChatConnectRedirectURL:         settings.WeChatConnectRedirectURL,
+		WeChatConnectFrontendRedirectURL: settings.WeChatConnectFrontendRedirectURL,
+
+		OIDCConnectEnabled:              settings.OIDCConnectEnabled,
+		OIDCConnectProviderName:         settings.OIDCConnectProviderName,
+		OIDCConnectClientID:             settings.OIDCConnectClientID,
+		OIDCConnectClientSecret:         settings.OIDCConnectClientSecret,
+		OIDCConnectIssuerURL:            settings.OIDCConnectIssuerURL,
+		OIDCConnectDiscoveryURL:         settings.OIDCConnectDiscoveryURL,
+		OIDCConnectAuthorizeURL:         settings.OIDCConnectAuthorizeURL,
+		OIDCConnectTokenURL:             settings.OIDCConnectTokenURL,
+		OIDCConnectUserInfoURL:          settings.OIDCConnectUserInfoURL,
+		OIDCConnectJWKSURL:              settings.OIDCConnectJWKSURL,
+		OIDCConnectScopes:               settings.OIDCConnectScopes,
+		OIDCConnectRedirectURL:          settings.OIDCConnectRedirectURL,
+		OIDCConnectFrontendRedirectURL:  settings.OIDCConnectFrontendRedirectURL,
+		OIDCConnectTokenAuthMethod:      settings.OIDCConnectTokenAuthMethod,
+		OIDCConnectUsePKCE:              settingsBoolPtr(settings.OIDCConnectUsePKCE),
+		OIDCConnectValidateIDToken:      settingsBoolPtr(settings.OIDCConnectValidateIDToken),
+		OIDCConnectAllowedSigningAlgs:   settings.OIDCConnectAllowedSigningAlgs,
+		OIDCConnectClockSkewSeconds:     settings.OIDCConnectClockSkewSeconds,
+		OIDCConnectRequireEmailVerified: settings.OIDCConnectRequireEmailVerified,
+		OIDCConnectUserInfoEmailPath:    settings.OIDCConnectUserInfoEmailPath,
+		OIDCConnectUserInfoIDPath:       settings.OIDCConnectUserInfoIDPath,
+		OIDCConnectUserInfoUsernamePath: settings.OIDCConnectUserInfoUsernamePath,
+
+		GitHubOAuthEnabled:             settings.GitHubOAuthEnabled,
+		GitHubOAuthClientID:            settings.GitHubOAuthClientID,
+		GitHubOAuthClientSecret:        settings.GitHubOAuthClientSecret,
+		GitHubOAuthRedirectURL:         settings.GitHubOAuthRedirectURL,
+		GitHubOAuthFrontendRedirectURL: settings.GitHubOAuthFrontendRedirectURL,
+		GoogleOAuthEnabled:             settings.GoogleOAuthEnabled,
+		GoogleOAuthClientID:            settings.GoogleOAuthClientID,
+		GoogleOAuthClientSecret:        settings.GoogleOAuthClientSecret,
+		GoogleOAuthRedirectURL:         settings.GoogleOAuthRedirectURL,
+		GoogleOAuthFrontendRedirectURL: settings.GoogleOAuthFrontendRedirectURL,
+
+		SiteName:                    settings.SiteName,
+		SiteLogo:                    settings.SiteLogo,
+		SiteSubtitle:                settings.SiteSubtitle,
+		APIBaseURL:                  settings.APIBaseURL,
+		ContactInfo:                 settings.ContactInfo,
+		DocURL:                      settings.DocURL,
+		HomeContent:                 settings.HomeContent,
+		HideCcsImportButton:         settings.HideCcsImportButton,
+		PurchaseSubscriptionEnabled: settingsBoolPtr(settings.PurchaseSubscriptionEnabled),
+		PurchaseSubscriptionURL:     settingsStringPtr(settings.PurchaseSubscriptionURL),
+		TableDefaultPageSize:        settings.TableDefaultPageSize,
+		TablePageSizeOptions:        settings.TablePageSizeOptions,
+		CustomMenuItems:             &customMenuItems,
+		CustomEndpoints:             &customEndpoints,
+
+		DefaultConcurrency:           settings.DefaultConcurrency,
+		DefaultBalance:               settings.DefaultBalance,
+		AffiliateRebateRate:          settingsFloat64Ptr(settings.AffiliateRebateRate),
+		AffiliateRebateFreezeHours:   settingsIntPtr(settings.AffiliateRebateFreezeHours),
+		AffiliateRebateDurationDays:  settingsIntPtr(settings.AffiliateRebateDurationDays),
+		AffiliateRebatePerInviteeCap: settingsFloat64Ptr(settings.AffiliateRebatePerInviteeCap),
+		DefaultUserRPMLimit:          settings.DefaultUserRPMLimit,
+		DefaultSubscriptions:         dtoDefaultSubscriptionSettingsFromService(settings.DefaultSubscriptions),
+
+		AuthSourceDefaultEmailBalance:             settingsFloat64Ptr(authSourceDefaults.Email.Balance),
+		AuthSourceDefaultEmailConcurrency:         settingsIntPtr(authSourceDefaults.Email.Concurrency),
+		AuthSourceDefaultEmailSubscriptions:       dtoDefaultSubscriptionSettingsPtrFromService(authSourceDefaults.Email.Subscriptions),
+		AuthSourceDefaultEmailGrantOnSignup:       settingsBoolPtr(authSourceDefaults.Email.GrantOnSignup),
+		AuthSourceDefaultEmailGrantOnFirstBind:    settingsBoolPtr(authSourceDefaults.Email.GrantOnFirstBind),
+		AuthSourceDefaultLinuxDoBalance:           settingsFloat64Ptr(authSourceDefaults.LinuxDo.Balance),
+		AuthSourceDefaultLinuxDoConcurrency:       settingsIntPtr(authSourceDefaults.LinuxDo.Concurrency),
+		AuthSourceDefaultLinuxDoSubscriptions:     dtoDefaultSubscriptionSettingsPtrFromService(authSourceDefaults.LinuxDo.Subscriptions),
+		AuthSourceDefaultLinuxDoGrantOnSignup:     settingsBoolPtr(authSourceDefaults.LinuxDo.GrantOnSignup),
+		AuthSourceDefaultLinuxDoGrantOnFirstBind:  settingsBoolPtr(authSourceDefaults.LinuxDo.GrantOnFirstBind),
+		AuthSourceDefaultOIDCBalance:              settingsFloat64Ptr(authSourceDefaults.OIDC.Balance),
+		AuthSourceDefaultOIDCConcurrency:          settingsIntPtr(authSourceDefaults.OIDC.Concurrency),
+		AuthSourceDefaultOIDCSubscriptions:        dtoDefaultSubscriptionSettingsPtrFromService(authSourceDefaults.OIDC.Subscriptions),
+		AuthSourceDefaultOIDCGrantOnSignup:        settingsBoolPtr(authSourceDefaults.OIDC.GrantOnSignup),
+		AuthSourceDefaultOIDCGrantOnFirstBind:     settingsBoolPtr(authSourceDefaults.OIDC.GrantOnFirstBind),
+		AuthSourceDefaultWeChatBalance:            settingsFloat64Ptr(authSourceDefaults.WeChat.Balance),
+		AuthSourceDefaultWeChatConcurrency:        settingsIntPtr(authSourceDefaults.WeChat.Concurrency),
+		AuthSourceDefaultWeChatSubscriptions:      dtoDefaultSubscriptionSettingsPtrFromService(authSourceDefaults.WeChat.Subscriptions),
+		AuthSourceDefaultWeChatGrantOnSignup:      settingsBoolPtr(authSourceDefaults.WeChat.GrantOnSignup),
+		AuthSourceDefaultWeChatGrantOnFirstBind:   settingsBoolPtr(authSourceDefaults.WeChat.GrantOnFirstBind),
+		AuthSourceDefaultGitHubBalance:            settingsFloat64Ptr(authSourceDefaults.GitHub.Balance),
+		AuthSourceDefaultGitHubConcurrency:        settingsIntPtr(authSourceDefaults.GitHub.Concurrency),
+		AuthSourceDefaultGitHubSubscriptions:      dtoDefaultSubscriptionSettingsPtrFromService(authSourceDefaults.GitHub.Subscriptions),
+		AuthSourceDefaultGitHubGrantOnSignup:      settingsBoolPtr(authSourceDefaults.GitHub.GrantOnSignup),
+		AuthSourceDefaultGitHubGrantOnFirstBind:   settingsBoolPtr(authSourceDefaults.GitHub.GrantOnFirstBind),
+		AuthSourceDefaultGoogleBalance:            settingsFloat64Ptr(authSourceDefaults.Google.Balance),
+		AuthSourceDefaultGoogleConcurrency:        settingsIntPtr(authSourceDefaults.Google.Concurrency),
+		AuthSourceDefaultGoogleSubscriptions:      dtoDefaultSubscriptionSettingsPtrFromService(authSourceDefaults.Google.Subscriptions),
+		AuthSourceDefaultGoogleGrantOnSignup:      settingsBoolPtr(authSourceDefaults.Google.GrantOnSignup),
+		AuthSourceDefaultGoogleGrantOnFirstBind:   settingsBoolPtr(authSourceDefaults.Google.GrantOnFirstBind),
+		AuthSourceDefaultDingTalkBalance:          settingsFloat64Ptr(authSourceDefaults.DingTalk.Balance),
+		AuthSourceDefaultDingTalkConcurrency:      settingsIntPtr(authSourceDefaults.DingTalk.Concurrency),
+		AuthSourceDefaultDingTalkSubscriptions:    dtoDefaultSubscriptionSettingsPtrFromService(authSourceDefaults.DingTalk.Subscriptions),
+		AuthSourceDefaultDingTalkGrantOnSignup:    settingsBoolPtr(authSourceDefaults.DingTalk.GrantOnSignup),
+		AuthSourceDefaultDingTalkGrantOnFirstBind: settingsBoolPtr(authSourceDefaults.DingTalk.GrantOnFirstBind),
+		ForceEmailOnThirdPartySignup:              settingsBoolPtr(authSourceDefaults.ForceEmailOnThirdPartySignup),
+
+		EnableModelFallback:      settings.EnableModelFallback,
+		FallbackModelAnthropic:   settings.FallbackModelAnthropic,
+		FallbackModelOpenAI:      settings.FallbackModelOpenAI,
+		FallbackModelGemini:      settings.FallbackModelGemini,
+		FallbackModelAntigravity: settings.FallbackModelAntigravity,
+		EnableIdentityPatch:      settings.EnableIdentityPatch,
+		IdentityPatchPrompt:      settings.IdentityPatchPrompt,
+
+		OpsMonitoringEnabled:         settingsBoolPtr(settings.OpsMonitoringEnabled),
+		OpsRealtimeMonitoringEnabled: settingsBoolPtr(settings.OpsRealtimeMonitoringEnabled),
+		OpsQueryModeDefault:          settingsStringPtr(settings.OpsQueryModeDefault),
+		OpsMetricsIntervalSeconds:    settingsIntPtr(settings.OpsMetricsIntervalSeconds),
+		MinClaudeCodeVersion:         settings.MinClaudeCodeVersion,
+		MaxClaudeCodeVersion:         settings.MaxClaudeCodeVersion,
+		AllowUngroupedKeyScheduling:  settings.AllowUngroupedKeyScheduling,
+		BackendModeEnabled:           settings.BackendModeEnabled,
+
+		EnableFingerprintUnification:       settingsBoolPtr(settings.EnableFingerprintUnification),
+		EnableMetadataPassthrough:          settingsBoolPtr(settings.EnableMetadataPassthrough),
+		EnableCCHSigning:                   settingsBoolPtr(settings.EnableCCHSigning),
+		EnableAnthropicCacheTTL1hInjection: settingsBoolPtr(settings.EnableAnthropicCacheTTL1hInjection),
+		RewriteMessageCacheControl:         settingsBoolPtr(settings.RewriteMessageCacheControl),
+		AntigravityUserAgentVersion:        settingsStringPtr(settings.AntigravityUserAgentVersion),
+		OpenAICodexUserAgent:               settingsStringPtr(settings.OpenAICodexUserAgent),
+		PaymentVisibleMethodAlipaySource:   settingsStringPtr(settings.PaymentVisibleMethodAlipaySource),
+		PaymentVisibleMethodWxpaySource:    settingsStringPtr(settings.PaymentVisibleMethodWxpaySource),
+		PaymentVisibleMethodAlipayEnabled:  settingsBoolPtr(settings.PaymentVisibleMethodAlipayEnabled),
+		PaymentVisibleMethodWxpayEnabled:   settingsBoolPtr(settings.PaymentVisibleMethodWxpayEnabled),
+		OpenAIAdvancedSchedulerEnabled:     settingsBoolPtr(settings.OpenAIAdvancedSchedulerEnabled),
+
+		BalanceLowNotifyEnabled:         settingsBoolPtr(settings.BalanceLowNotifyEnabled),
+		BalanceLowNotifyThreshold:       settingsFloat64Ptr(settings.BalanceLowNotifyThreshold),
+		BalanceLowNotifyRechargeURL:     settingsStringPtr(settings.BalanceLowNotifyRechargeURL),
+		SubscriptionExpiryNotifyEnabled: settingsBoolPtr(settings.SubscriptionExpiryNotifyEnabled),
+		AccountQuotaNotifyEnabled:       settingsBoolPtr(settings.AccountQuotaNotifyEnabled),
+		AccountQuotaNotifyEmails: func() *[]dto.NotifyEmailEntry {
+			v := dto.NotifyEmailEntriesFromService(settings.AccountQuotaNotifyEmails)
+			return &v
+		}(),
+
+		ChannelMonitorEnabled:                settingsBoolPtr(settings.ChannelMonitorEnabled),
+		ChannelMonitorDefaultIntervalSeconds: settingsIntPtr(settings.ChannelMonitorDefaultIntervalSeconds),
+		AvailableChannelsEnabled:             settingsBoolPtr(settings.AvailableChannelsEnabled),
+		AffiliateEnabled:                     settingsBoolPtr(settings.AffiliateEnabled),
+		RiskControlEnabled:                   settingsBoolPtr(settings.RiskControlEnabled),
+	}
+	return req
+}
+
+func operatorSettingsUpdateRequest(input UpdateSettingsRequest, previousSettings *service.SystemSettings, previousAuthSourceDefaults *service.AuthSourceDefaultSettings) UpdateSettingsRequest {
+	req := settingsUpdateRequestFromExisting(previousSettings, previousAuthSourceDefaults)
+
+	req.RegistrationEnabled = input.RegistrationEnabled
+	req.EmailVerifyEnabled = input.EmailVerifyEnabled
+	req.RegistrationEmailSuffixWhitelist = input.RegistrationEmailSuffixWhitelist
+	req.PromoCodeEnabled = input.PromoCodeEnabled
+	req.PasswordResetEnabled = input.PasswordResetEnabled
+	req.FrontendURL = input.FrontendURL
+	req.InvitationCodeEnabled = input.InvitationCodeEnabled
+	req.LoginAgreementEnabled = input.LoginAgreementEnabled
+	req.LoginAgreementMode = input.LoginAgreementMode
+	req.LoginAgreementUpdatedAt = input.LoginAgreementUpdatedAt
+	req.LoginAgreementDocuments = input.LoginAgreementDocuments
+
+	req.SiteName = input.SiteName
+	req.SiteLogo = input.SiteLogo
+	req.SiteSubtitle = input.SiteSubtitle
+	req.APIBaseURL = input.APIBaseURL
+	req.ContactInfo = input.ContactInfo
+	req.DocURL = input.DocURL
+	req.HomeContent = input.HomeContent
+	req.HideCcsImportButton = input.HideCcsImportButton
+	if input.PurchaseSubscriptionEnabled != nil {
+		req.PurchaseSubscriptionEnabled = input.PurchaseSubscriptionEnabled
+	}
+	if input.PurchaseSubscriptionURL != nil {
+		req.PurchaseSubscriptionURL = input.PurchaseSubscriptionURL
+	}
+	req.TableDefaultPageSize = input.TableDefaultPageSize
+	if input.TablePageSizeOptions != nil {
+		req.TablePageSizeOptions = input.TablePageSizeOptions
+	}
+	if input.CustomMenuItems != nil {
+		req.CustomMenuItems = input.CustomMenuItems
+	}
+	if input.CustomEndpoints != nil {
+		req.CustomEndpoints = input.CustomEndpoints
+	}
+
+	req.DefaultConcurrency = input.DefaultConcurrency
+	req.DefaultBalance = input.DefaultBalance
+	req.DefaultUserRPMLimit = input.DefaultUserRPMLimit
+	req.DefaultSubscriptions = input.DefaultSubscriptions
+	copyOperatorAuthSourceDefaults(&req, input)
+
+	if input.AffiliateRebateRate != nil {
+		req.AffiliateRebateRate = input.AffiliateRebateRate
+	}
+	if input.AffiliateRebateFreezeHours != nil {
+		req.AffiliateRebateFreezeHours = input.AffiliateRebateFreezeHours
+	}
+	if input.AffiliateRebateDurationDays != nil {
+		req.AffiliateRebateDurationDays = input.AffiliateRebateDurationDays
+	}
+	if input.AffiliateRebatePerInviteeCap != nil {
+		req.AffiliateRebatePerInviteeCap = input.AffiliateRebatePerInviteeCap
+	}
+	if input.AffiliateEnabled != nil {
+		req.AffiliateEnabled = input.AffiliateEnabled
+	}
+	if input.ChannelMonitorEnabled != nil {
+		req.ChannelMonitorEnabled = input.ChannelMonitorEnabled
+	}
+	if input.ChannelMonitorDefaultIntervalSeconds != nil {
+		req.ChannelMonitorDefaultIntervalSeconds = input.ChannelMonitorDefaultIntervalSeconds
+	}
+	if input.AvailableChannelsEnabled != nil {
+		req.AvailableChannelsEnabled = input.AvailableChannelsEnabled
+	}
+
+	return req
+}
+
+func copyOperatorAuthSourceDefaults(target *UpdateSettingsRequest, source UpdateSettingsRequest) {
+	if source.AuthSourceDefaultEmailBalance != nil {
+		target.AuthSourceDefaultEmailBalance = source.AuthSourceDefaultEmailBalance
+	}
+	if source.AuthSourceDefaultEmailConcurrency != nil {
+		target.AuthSourceDefaultEmailConcurrency = source.AuthSourceDefaultEmailConcurrency
+	}
+	if source.AuthSourceDefaultEmailSubscriptions != nil {
+		target.AuthSourceDefaultEmailSubscriptions = source.AuthSourceDefaultEmailSubscriptions
+	}
+	if source.AuthSourceDefaultEmailGrantOnSignup != nil {
+		target.AuthSourceDefaultEmailGrantOnSignup = source.AuthSourceDefaultEmailGrantOnSignup
+	}
+	if source.AuthSourceDefaultEmailGrantOnFirstBind != nil {
+		target.AuthSourceDefaultEmailGrantOnFirstBind = source.AuthSourceDefaultEmailGrantOnFirstBind
+	}
+	if source.AuthSourceDefaultLinuxDoBalance != nil {
+		target.AuthSourceDefaultLinuxDoBalance = source.AuthSourceDefaultLinuxDoBalance
+	}
+	if source.AuthSourceDefaultLinuxDoConcurrency != nil {
+		target.AuthSourceDefaultLinuxDoConcurrency = source.AuthSourceDefaultLinuxDoConcurrency
+	}
+	if source.AuthSourceDefaultLinuxDoSubscriptions != nil {
+		target.AuthSourceDefaultLinuxDoSubscriptions = source.AuthSourceDefaultLinuxDoSubscriptions
+	}
+	if source.AuthSourceDefaultLinuxDoGrantOnSignup != nil {
+		target.AuthSourceDefaultLinuxDoGrantOnSignup = source.AuthSourceDefaultLinuxDoGrantOnSignup
+	}
+	if source.AuthSourceDefaultLinuxDoGrantOnFirstBind != nil {
+		target.AuthSourceDefaultLinuxDoGrantOnFirstBind = source.AuthSourceDefaultLinuxDoGrantOnFirstBind
+	}
+	if source.AuthSourceDefaultOIDCBalance != nil {
+		target.AuthSourceDefaultOIDCBalance = source.AuthSourceDefaultOIDCBalance
+	}
+	if source.AuthSourceDefaultOIDCConcurrency != nil {
+		target.AuthSourceDefaultOIDCConcurrency = source.AuthSourceDefaultOIDCConcurrency
+	}
+	if source.AuthSourceDefaultOIDCSubscriptions != nil {
+		target.AuthSourceDefaultOIDCSubscriptions = source.AuthSourceDefaultOIDCSubscriptions
+	}
+	if source.AuthSourceDefaultOIDCGrantOnSignup != nil {
+		target.AuthSourceDefaultOIDCGrantOnSignup = source.AuthSourceDefaultOIDCGrantOnSignup
+	}
+	if source.AuthSourceDefaultOIDCGrantOnFirstBind != nil {
+		target.AuthSourceDefaultOIDCGrantOnFirstBind = source.AuthSourceDefaultOIDCGrantOnFirstBind
+	}
+	if source.AuthSourceDefaultWeChatBalance != nil {
+		target.AuthSourceDefaultWeChatBalance = source.AuthSourceDefaultWeChatBalance
+	}
+	if source.AuthSourceDefaultWeChatConcurrency != nil {
+		target.AuthSourceDefaultWeChatConcurrency = source.AuthSourceDefaultWeChatConcurrency
+	}
+	if source.AuthSourceDefaultWeChatSubscriptions != nil {
+		target.AuthSourceDefaultWeChatSubscriptions = source.AuthSourceDefaultWeChatSubscriptions
+	}
+	if source.AuthSourceDefaultWeChatGrantOnSignup != nil {
+		target.AuthSourceDefaultWeChatGrantOnSignup = source.AuthSourceDefaultWeChatGrantOnSignup
+	}
+	if source.AuthSourceDefaultWeChatGrantOnFirstBind != nil {
+		target.AuthSourceDefaultWeChatGrantOnFirstBind = source.AuthSourceDefaultWeChatGrantOnFirstBind
+	}
+	if source.AuthSourceDefaultGitHubBalance != nil {
+		target.AuthSourceDefaultGitHubBalance = source.AuthSourceDefaultGitHubBalance
+	}
+	if source.AuthSourceDefaultGitHubConcurrency != nil {
+		target.AuthSourceDefaultGitHubConcurrency = source.AuthSourceDefaultGitHubConcurrency
+	}
+	if source.AuthSourceDefaultGitHubSubscriptions != nil {
+		target.AuthSourceDefaultGitHubSubscriptions = source.AuthSourceDefaultGitHubSubscriptions
+	}
+	if source.AuthSourceDefaultGitHubGrantOnSignup != nil {
+		target.AuthSourceDefaultGitHubGrantOnSignup = source.AuthSourceDefaultGitHubGrantOnSignup
+	}
+	if source.AuthSourceDefaultGitHubGrantOnFirstBind != nil {
+		target.AuthSourceDefaultGitHubGrantOnFirstBind = source.AuthSourceDefaultGitHubGrantOnFirstBind
+	}
+	if source.AuthSourceDefaultGoogleBalance != nil {
+		target.AuthSourceDefaultGoogleBalance = source.AuthSourceDefaultGoogleBalance
+	}
+	if source.AuthSourceDefaultGoogleConcurrency != nil {
+		target.AuthSourceDefaultGoogleConcurrency = source.AuthSourceDefaultGoogleConcurrency
+	}
+	if source.AuthSourceDefaultGoogleSubscriptions != nil {
+		target.AuthSourceDefaultGoogleSubscriptions = source.AuthSourceDefaultGoogleSubscriptions
+	}
+	if source.AuthSourceDefaultGoogleGrantOnSignup != nil {
+		target.AuthSourceDefaultGoogleGrantOnSignup = source.AuthSourceDefaultGoogleGrantOnSignup
+	}
+	if source.AuthSourceDefaultGoogleGrantOnFirstBind != nil {
+		target.AuthSourceDefaultGoogleGrantOnFirstBind = source.AuthSourceDefaultGoogleGrantOnFirstBind
+	}
+	if source.AuthSourceDefaultDingTalkBalance != nil {
+		target.AuthSourceDefaultDingTalkBalance = source.AuthSourceDefaultDingTalkBalance
+	}
+	if source.AuthSourceDefaultDingTalkConcurrency != nil {
+		target.AuthSourceDefaultDingTalkConcurrency = source.AuthSourceDefaultDingTalkConcurrency
+	}
+	if source.AuthSourceDefaultDingTalkSubscriptions != nil {
+		target.AuthSourceDefaultDingTalkSubscriptions = source.AuthSourceDefaultDingTalkSubscriptions
+	}
+	if source.AuthSourceDefaultDingTalkGrantOnSignup != nil {
+		target.AuthSourceDefaultDingTalkGrantOnSignup = source.AuthSourceDefaultDingTalkGrantOnSignup
+	}
+	if source.AuthSourceDefaultDingTalkGrantOnFirstBind != nil {
+		target.AuthSourceDefaultDingTalkGrantOnFirstBind = source.AuthSourceDefaultDingTalkGrantOnFirstBind
+	}
+	if source.ForceEmailOnThirdPartySignup != nil {
+		target.ForceEmailOnThirdPartySignup = source.ForceEmailOnThirdPartySignup
+	}
+}
+
 // UpdateSettings 更新系统设置
 // PUT /api/v1/admin/settings
 func (h *SettingHandler) UpdateSettings(c *gin.Context) {
@@ -657,6 +1100,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
+	}
+	if isOperatorBackofficeRequest(c) {
+		req = operatorSettingsUpdateRequest(req, previousSettings, previousAuthSourceDefaults)
 	}
 
 	// 验证参数
@@ -2047,7 +2493,11 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	} else if fastPolicy != nil {
 		payload.OpenAIFastPolicySettings = openaiFastPolicySettingsToDTO(fastPolicy)
 	}
-	response.Success(c, systemSettingsResponseData(payload, updatedAuthSourceDefaults))
+	data := systemSettingsResponseData(payload, updatedAuthSourceDefaults)
+	if isOperatorBackofficeRequest(c) {
+		data = operatorSettingsResponseData(data)
+	}
+	response.Success(c, data)
 }
 
 // hasPaymentFields returns true if any payment-related field was explicitly provided.
@@ -2669,6 +3119,92 @@ func systemSettingsResponseData(settings dto.SystemSettings, authSourceDefaults 
 	data["force_email_on_third_party_signup"] = authSourceDefaults.ForceEmailOnThirdPartySignup
 
 	return data
+}
+
+var operatorSettingsResponseKeys = map[string]struct{}{
+	"registration_enabled":                             {},
+	"email_verify_enabled":                             {},
+	"registration_email_suffix_whitelist":              {},
+	"promo_code_enabled":                               {},
+	"password_reset_enabled":                           {},
+	"frontend_url":                                     {},
+	"invitation_code_enabled":                          {},
+	"login_agreement_enabled":                          {},
+	"login_agreement_mode":                             {},
+	"login_agreement_updated_at":                       {},
+	"login_agreement_documents":                        {},
+	"site_name":                                        {},
+	"site_logo":                                        {},
+	"site_subtitle":                                    {},
+	"api_base_url":                                     {},
+	"contact_info":                                     {},
+	"doc_url":                                          {},
+	"home_content":                                     {},
+	"hide_ccs_import_button":                           {},
+	"purchase_subscription_enabled":                    {},
+	"purchase_subscription_url":                        {},
+	"table_default_page_size":                          {},
+	"table_page_size_options":                          {},
+	"custom_menu_items":                                {},
+	"custom_endpoints":                                 {},
+	"default_concurrency":                              {},
+	"default_balance":                                  {},
+	"default_user_rpm_limit":                           {},
+	"default_subscriptions":                            {},
+	"auth_source_default_email_balance":                {},
+	"auth_source_default_email_concurrency":            {},
+	"auth_source_default_email_subscriptions":          {},
+	"auth_source_default_email_grant_on_signup":        {},
+	"auth_source_default_email_grant_on_first_bind":    {},
+	"auth_source_default_linuxdo_balance":              {},
+	"auth_source_default_linuxdo_concurrency":          {},
+	"auth_source_default_linuxdo_subscriptions":        {},
+	"auth_source_default_linuxdo_grant_on_signup":      {},
+	"auth_source_default_linuxdo_grant_on_first_bind":  {},
+	"auth_source_default_oidc_balance":                 {},
+	"auth_source_default_oidc_concurrency":             {},
+	"auth_source_default_oidc_subscriptions":           {},
+	"auth_source_default_oidc_grant_on_signup":         {},
+	"auth_source_default_oidc_grant_on_first_bind":     {},
+	"auth_source_default_wechat_balance":               {},
+	"auth_source_default_wechat_concurrency":           {},
+	"auth_source_default_wechat_subscriptions":         {},
+	"auth_source_default_wechat_grant_on_signup":       {},
+	"auth_source_default_wechat_grant_on_first_bind":   {},
+	"auth_source_default_github_balance":               {},
+	"auth_source_default_github_concurrency":           {},
+	"auth_source_default_github_subscriptions":         {},
+	"auth_source_default_github_grant_on_signup":       {},
+	"auth_source_default_github_grant_on_first_bind":   {},
+	"auth_source_default_google_balance":               {},
+	"auth_source_default_google_concurrency":           {},
+	"auth_source_default_google_subscriptions":         {},
+	"auth_source_default_google_grant_on_signup":       {},
+	"auth_source_default_google_grant_on_first_bind":   {},
+	"auth_source_default_dingtalk_balance":             {},
+	"auth_source_default_dingtalk_concurrency":         {},
+	"auth_source_default_dingtalk_subscriptions":       {},
+	"auth_source_default_dingtalk_grant_on_signup":     {},
+	"auth_source_default_dingtalk_grant_on_first_bind": {},
+	"force_email_on_third_party_signup":                {},
+	"affiliate_enabled":                                {},
+	"affiliate_rebate_rate":                            {},
+	"affiliate_rebate_freeze_hours":                    {},
+	"affiliate_rebate_duration_days":                   {},
+	"affiliate_rebate_per_invitee_cap":                 {},
+	"channel_monitor_enabled":                          {},
+	"channel_monitor_default_interval_seconds":         {},
+	"available_channels_enabled":                       {},
+}
+
+func operatorSettingsResponseData(data map[string]any) map[string]any {
+	out := make(map[string]any, len(operatorSettingsResponseKeys))
+	for key := range operatorSettingsResponseKeys {
+		if value, ok := data[key]; ok {
+			out[key] = value
+		}
+	}
+	return out
 }
 
 func equalStringSlice(a, b []string) bool {

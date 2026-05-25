@@ -765,9 +765,9 @@ import { getRemainingDurationParts, isOneTimeDailyQuota, type RemainingDurationP
 const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
-const canManageSubscriptions = computed(() => authStore.isAdmin)
+const canManageSubscriptions = computed(() => authStore.isBackoffice)
 const userSearchPlaceholder = computed(() =>
-  canManageSubscriptions.value ? t('admin.users.searchUsers') : t('admin.users.searchUsersBasic')
+  authStore.isOperator ? t('admin.users.searchUsersBasic') : t('admin.users.searchUsers')
 )
 
 interface GroupOption {

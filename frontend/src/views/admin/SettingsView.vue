@@ -45,7 +45,7 @@
         </div>
 
         <!-- Tab: Security — Admin API Key -->
-        <div v-show="activeTab === 'security'" class="space-y-6">
+        <div v-if="isAdmin" v-show="activeTab === 'security'" class="space-y-6">
           <!-- Admin API Key Settings -->
           <div class="card">
             <div
@@ -1534,6 +1534,7 @@
 
               <!-- TOTP 2FA -->
               <div
+                v-if="isAdmin"
                 class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
               >
                 <div>
@@ -1560,7 +1561,7 @@
           </div>
 
           <!-- API Key IP ACL Settings -->
-          <div class="card">
+          <div v-if="isAdmin" class="card">
             <div
               class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -1587,7 +1588,7 @@
           </div>
 
           <!-- Cloudflare Turnstile Settings -->
-          <div class="card">
+          <div v-if="isAdmin" class="card">
             <div
               class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -1670,7 +1671,7 @@
           </div>
 
           <!-- LinuxDo Connect OAuth 登录 -->
-          <div class="card">
+          <div v-if="isAdmin" class="card">
             <div
               class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -1788,7 +1789,7 @@
           </div>
 
           <!-- GitHub / Google 邮箱快捷登录 -->
-          <div class="card">
+          <div v-if="isAdmin" class="card">
             <div
               class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -2014,7 +2015,7 @@
           </div>
 
           <!-- WeChat Connect OAuth 登录 -->
-          <div class="card">
+          <div v-if="isAdmin" class="card">
             <div
               class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -2356,7 +2357,7 @@
           </div>
 
           <!-- DingTalk Connect OAuth 登录 -->
-          <div class="card">
+          <div v-if="isAdmin" class="card">
             <div
               class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -2644,7 +2645,7 @@
           </div>
 
           <!-- Generic OIDC OAuth 登录 -->
-          <div class="card">
+          <div v-if="isAdmin" class="card">
             <div
               class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
@@ -5023,7 +5024,7 @@
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {{ t('admin.settings.features.channelMonitor.description') }}
             </p>
-            <p class="mt-1.5 text-xs">
+            <p v-if="isAdmin" class="mt-1.5 text-xs">
               <router-link
                 to="/admin/channels/monitor"
                 class="inline-flex items-center gap-1 text-primary-600 hover:underline dark:text-primary-400"
@@ -5073,7 +5074,7 @@
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {{ t('admin.settings.features.availableChannels.description') }}
             </p>
-            <p class="mt-1.5 text-xs">
+            <p v-if="isAdmin" class="mt-1.5 text-xs">
               <router-link
                 to="/admin/channels/pricing"
                 class="inline-flex items-center gap-1 text-primary-600 hover:underline dark:text-primary-400"
@@ -5098,7 +5099,7 @@
           </div>
         </div>
 
-        <div class="card">
+        <div v-if="isAdmin" class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.riskControl.title') }}
@@ -5227,7 +5228,7 @@
               </div>
 
               <!-- 专属用户管理 -->
-              <div class="border-t border-gray-100 pt-6 dark:border-dark-700">
+              <div v-if="isAdmin" class="border-t border-gray-100 pt-6 dark:border-dark-700">
                 <div class="mb-3 flex items-center justify-between">
                   <div>
                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
@@ -5364,7 +5365,7 @@
 
         <!-- Affiliate add/edit modal -->
         <div
-          v-if="affiliateModal.open"
+          v-if="isAdmin && affiliateModal.open"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           @click.self="closeAffiliateModal"
         >
@@ -5489,7 +5490,7 @@
 
         <!-- Affiliate batch rate modal -->
         <div
-          v-if="affiliateBatchModal.open"
+          v-if="isAdmin && affiliateBatchModal.open"
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           @click.self="affiliateBatchModal.open = false"
         >
@@ -6593,7 +6594,7 @@ import EmailTemplateEditor from "@/views/admin/settings/EmailTemplateEditor.vue"
 import { useClipboard } from "@/composables/useClipboard";
 import { affiliatesAPI, type AffiliateAdminEntry, type SimpleUser as AffiliateSimpleUser } from "@/api/admin/affiliates";
 import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
-import { useAppStore } from "@/stores";
+import { useAppStore, useAuthStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
 import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
 import {
@@ -6605,8 +6606,10 @@ import {
 
 const { t, locale } = useI18n();
 const appStore = useAppStore();
+const authStore = useAuthStore();
 const adminSettingsStore = useAdminSettingsStore();
 const isZhLocale = computed(() => locale.value.startsWith("zh"));
+const isAdmin = computed(() => authStore.isAdmin);
 
 function localText(zh: string, en: string): string {
   return isZhLocale.value ? zh : en;
@@ -6635,7 +6638,7 @@ type SettingsTab =
   | "email"
   | "backup";
 const activeTab = ref<SettingsTab>("general");
-const settingsTabs = [
+const allSettingsTabs = [
   { key: "general" as SettingsTab, icon: "home" as const },
   { key: "agreement" as SettingsTab, icon: "document" as const },
   { key: "features" as SettingsTab, icon: "bolt" as const },
@@ -6646,6 +6649,28 @@ const settingsTabs = [
   { key: "email" as SettingsTab, icon: "mail" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
 ];
+const operatorSettingsTabKeys = new Set<SettingsTab>([
+  "general",
+  "agreement",
+  "features",
+  "security",
+  "users",
+]);
+const settingsTabs = computed(() =>
+  allSettingsTabs.filter(
+    (tab) => isAdmin.value || operatorSettingsTabKeys.has(tab.key),
+  ),
+);
+
+watch(
+  settingsTabs,
+  (tabs) => {
+    if (!tabs.some((tab) => tab.key === activeTab.value)) {
+      activeTab.value = tabs[0]?.key ?? "general";
+    }
+  },
+  { immediate: true },
+);
 
 const settingsTabKeyboardActions = {
   ArrowLeft: -1,
@@ -6676,19 +6701,20 @@ function handleSettingsTabKeydown(event: KeyboardEvent, tab: SettingsTab): void 
   }
 
   event.preventDefault();
-  const currentIndex = settingsTabs.findIndex((item) => item.key === tab);
+  const currentIndex = settingsTabs.value.findIndex((item) => item.key === tab);
   let nextIndex = currentIndex < 0 ? 0 : currentIndex;
 
   if (action === "first") {
     nextIndex = 0;
   } else if (action === "last") {
-    nextIndex = settingsTabs.length - 1;
+    nextIndex = settingsTabs.value.length - 1;
   } else {
     nextIndex =
-      (nextIndex + action + settingsTabs.length) % settingsTabs.length;
+      (nextIndex + action + settingsTabs.value.length) %
+      settingsTabs.value.length;
   }
 
-  const nextTab = settingsTabs[nextIndex]?.key;
+  const nextTab = settingsTabs.value[nextIndex]?.key;
   if (!nextTab) {
     return;
   }
@@ -7784,8 +7810,10 @@ async function loadSettings() {
       openaiFastPolicyLoaded.value = true;
     }
 
-    // Load web search emulation config separately
-    await loadWebSearchConfig();
+    // Web Search 模拟会读取代理/IP 与 provider 配置，仅管理员可加载。
+    if (isAdmin.value) {
+      await loadWebSearchConfig();
+    }
   } catch (error: unknown) {
     loadFailed.value = true;
     appStore.showError(
@@ -8307,8 +8335,8 @@ async function saveSettings() {
         }));
       openaiFastPolicyLoaded.value = true;
     }
-    // Save web search emulation config separately (errors handled internally)
-    const wsOk = await saveWebSearchConfig();
+    // Web Search 模拟会读取代理/IP 与 provider 配置，仅管理员可保存。
+    const wsOk = isAdmin.value ? await saveWebSearchConfig() : true;
     // Refresh cached settings so sidebar/header update immediately
     await appStore.fetchPublicSettings(true);
     await adminSettingsStore.fetch(true);
@@ -9123,13 +9151,15 @@ async function handleDeleteProvider() {
 onMounted(() => {
   loadSettings();
   loadSubscriptionGroups();
-  loadAdminApiKey();
-  loadOverloadCooldownSettings();
-  loadRateLimit429CooldownSettings();
-  loadStreamTimeoutSettings();
-  loadRectifierSettings();
-  loadBetaPolicySettings();
-  loadProviders();
+  if (isAdmin.value) {
+    loadAdminApiKey();
+    loadOverloadCooldownSettings();
+    loadRateLimit429CooldownSettings();
+    loadStreamTimeoutSettings();
+    loadRectifierSettings();
+    loadBetaPolicySettings();
+    loadProviders();
+  }
 });
 
 // =========================
@@ -9479,7 +9509,7 @@ async function submitAffiliateBatchModal() {
 watch(
   () => form.affiliate_enabled,
   (enabled, prev) => {
-    if (enabled && !prev) {
+    if (isAdmin.value && enabled && !prev) {
       loadAffiliateUsers();
     }
   },

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,7 +70,10 @@ func TestAdminPermissionRoutesRejectOperatorOnSensitiveRoutes(t *testing.T) {
 	}{
 		{name: "accounts", method: http.MethodGet, path: "/api/v1/admin/accounts"},
 		{name: "proxies", method: http.MethodGet, path: "/api/v1/admin/proxies"},
-		{name: "settings", method: http.MethodGet, path: "/api/v1/admin/settings"},
+		{name: "settings_admin_api_key", method: http.MethodGet, path: "/api/v1/admin/settings/admin-api-key"},
+		{name: "settings_smtp_test", method: http.MethodPost, path: "/api/v1/admin/settings/test-smtp"},
+		{name: "settings_overload_cooldown", method: http.MethodGet, path: "/api/v1/admin/settings/overload-cooldown"},
+		{name: "settings_web_search", method: http.MethodGet, path: "/api/v1/admin/settings/web-search-emulation"},
 		{name: "user_api_keys", method: http.MethodGet, path: "/api/v1/admin/users/1/api-keys"},
 		{name: "user_role", method: http.MethodPut, path: "/api/v1/admin/users/1/role"},
 		{name: "group_api_keys", method: http.MethodGet, path: "/api/v1/admin/groups/1/api-keys"},
@@ -81,9 +85,6 @@ func TestAdminPermissionRoutesRejectOperatorOnSensitiveRoutes(t *testing.T) {
 		{name: "redeem_codes_batch_update", method: http.MethodPost, path: "/api/v1/admin/redeem-codes/batch-update"},
 		{name: "usage_search_api_keys", method: http.MethodGet, path: "/api/v1/admin/usage/search-api-keys"},
 		{name: "affiliate_user_config", method: http.MethodGet, path: "/api/v1/admin/affiliates/users"},
-		{name: "promo_codes_create", method: http.MethodPost, path: "/api/v1/admin/promo-codes"},
-		{name: "promo_codes_update", method: http.MethodPut, path: "/api/v1/admin/promo-codes/1"},
-		{name: "promo_codes_delete", method: http.MethodDelete, path: "/api/v1/admin/promo-codes/1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := &adminPermissionRouteService{}
@@ -97,6 +98,38 @@ func TestAdminPermissionRoutesRejectOperatorOnSensitiveRoutes(t *testing.T) {
 			require.False(t, svc.listAccountsCalled)
 			require.False(t, svc.listProxiesCalled)
 			require.False(t, svc.listRedeemCodesCalled)
+		})
+	}
+}
+
+func TestAdminPermissionRoutesAllowOperatorOperationalMutations(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{name: "promo_codes_create", method: http.MethodPost, path: "/api/v1/admin/promo-codes", body: ""},
+		{name: "promo_codes_update", method: http.MethodPut, path: "/api/v1/admin/promo-codes/1", body: ""},
+		{name: "promo_codes_delete", method: http.MethodDelete, path: "/api/v1/admin/promo-codes/not-number"},
+		{name: "subscriptions_assign", method: http.MethodPost, path: "/api/v1/admin/subscriptions/assign", body: ""},
+		{name: "subscriptions_bulk_assign", method: http.MethodPost, path: "/api/v1/admin/subscriptions/bulk-assign", body: ""},
+		{name: "subscriptions_extend", method: http.MethodPost, path: "/api/v1/admin/subscriptions/not-number/extend", body: "{}"},
+		{name: "subscriptions_reset_quota", method: http.MethodPost, path: "/api/v1/admin/subscriptions/not-number/reset-quota", body: "{}"},
+		{name: "subscriptions_revoke", method: http.MethodDelete, path: "/api/v1/admin/subscriptions/not-number"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &adminPermissionRouteService{}
+			router := newAdminPermissionRouteRouter(service.RoleOperator, svc)
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			if tc.body != "" {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			router.ServeHTTP(w, req)
+
+			require.NotEqual(t, http.StatusForbidden, w.Code)
 		})
 	}
 }
@@ -135,6 +168,42 @@ func TestPaymentOrderMutationRoutesRejectOperator(t *testing.T) {
 
 			require.Equal(t, http.StatusForbidden, w.Code)
 			require.False(t, called)
+		})
+	}
+}
+
+func TestPaymentPlanMutationRoutesAllowOperator(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, tc := range []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{name: "create", method: http.MethodPost, path: "/api/v1/admin/payment/plans"},
+		{name: "update", method: http.MethodPut, path: "/api/v1/admin/payment/plans/1"},
+		{name: "delete", method: http.MethodDelete, path: "/api/v1/admin/payment/plans/1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			router := gin.New()
+			adminGroup := router.Group("/api/v1/admin/payment")
+			adminGroup.Use(func(c *gin.Context) {
+				c.Set(string(middleware.ContextKeyUserRole), service.RoleOperator)
+				c.Next()
+			})
+
+			plans := adminGroup.Group("/plans")
+			plans.POST("", func(c *gin.Context) { called = true })
+			plans.PUT("/:id", func(c *gin.Context) { called = true })
+			plans.DELETE("/:id", func(c *gin.Context) { called = true })
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			router.ServeHTTP(w, req)
+
+			require.Equal(t, http.StatusOK, w.Code)
+			require.True(t, called)
 		})
 	}
 }
@@ -210,7 +279,8 @@ func newAdminPermissionRouteRouter(role string, svc *adminPermissionRouteService
 	registerRedeemCodeRoutes(admin, adminOnly, h)
 	registerPromoCodeRoutes(admin, adminOnly, h)
 	registerProxyRoutes(adminOnly, h)
-	registerSettingsRoutes(adminOnly, h)
+	registerSettingsRoutes(admin, adminOnly, h)
+	registerSubscriptionRoutes(admin, adminOnly, h)
 	registerUsageRoutes(admin, adminOnly, h)
 	registerAffiliateRoutes(admin, adminOnly, h)
 

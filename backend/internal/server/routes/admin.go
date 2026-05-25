@@ -52,8 +52,8 @@ func RegisterAdminRoutes(
 		// 优惠码管理
 		registerPromoCodeRoutes(admin, adminOnly, h)
 
-		// 系统设置
-		registerSettingsRoutes(adminOnly, h)
+		// 系统设置：运营员可读写非敏感运营设置，密钥/运维/核心子设置仍限管理员。
+		registerSettingsRoutes(admin, adminOnly, h)
 
 		// 数据管理
 		registerDataManagementRoutes(adminOnly, h)
@@ -413,55 +413,55 @@ func registerRedeemCodeRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup
 
 func registerPromoCodeRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *handler.Handlers) {
 	promoCodes := admin.Group("/promo-codes")
-	promoCodesAdminOnly := adminOnly.Group("/promo-codes")
 	{
 		promoCodes.GET("", h.Admin.Promo.List)
 		promoCodes.GET("/:id", h.Admin.Promo.GetByID)
 		promoCodes.GET("/:id/usages", h.Admin.Promo.GetUsages)
 
-		// 优惠码创建、修改和删除会改变用户权益，仅限管理员。
-		promoCodesAdminOnly.POST("", h.Admin.Promo.Create)
-		promoCodesAdminOnly.PUT("/:id", h.Admin.Promo.Update)
-		promoCodesAdminOnly.DELETE("/:id", h.Admin.Promo.Delete)
+		// 优惠码属于运营资源，运营员可以创建、修改和删除。
+		promoCodes.POST("", h.Admin.Promo.Create)
+		promoCodes.PUT("/:id", h.Admin.Promo.Update)
+		promoCodes.DELETE("/:id", h.Admin.Promo.Delete)
 	}
 }
 
-func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerSettingsRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *handler.Handlers) {
 	adminSettings := admin.Group("/settings")
+	adminSettingsAdminOnly := adminOnly.Group("/settings")
 	{
 		adminSettings.GET("", h.Admin.Setting.GetSettings)
 		adminSettings.PUT("", h.Admin.Setting.UpdateSettings)
-		adminSettings.POST("/test-smtp", h.Admin.Setting.TestSMTPConnection)
-		adminSettings.POST("/send-test-email", h.Admin.Setting.SendTestEmail)
-		adminSettings.GET("/email-templates", h.Admin.Setting.ListEmailTemplates)
-		adminSettings.POST("/email-template-preview", h.Admin.Setting.PreviewEmailTemplate)
-		adminSettings.GET("/email-templates/:event/:locale", h.Admin.Setting.GetEmailTemplate)
-		adminSettings.PUT("/email-templates/:event/:locale", h.Admin.Setting.UpdateEmailTemplate)
-		adminSettings.POST("/email-templates/:event/:locale/restore-official", h.Admin.Setting.RestoreOfficialEmailTemplate)
+		adminSettingsAdminOnly.POST("/test-smtp", h.Admin.Setting.TestSMTPConnection)
+		adminSettingsAdminOnly.POST("/send-test-email", h.Admin.Setting.SendTestEmail)
+		adminSettingsAdminOnly.GET("/email-templates", h.Admin.Setting.ListEmailTemplates)
+		adminSettingsAdminOnly.POST("/email-template-preview", h.Admin.Setting.PreviewEmailTemplate)
+		adminSettingsAdminOnly.GET("/email-templates/:event/:locale", h.Admin.Setting.GetEmailTemplate)
+		adminSettingsAdminOnly.PUT("/email-templates/:event/:locale", h.Admin.Setting.UpdateEmailTemplate)
+		adminSettingsAdminOnly.POST("/email-templates/:event/:locale/restore-official", h.Admin.Setting.RestoreOfficialEmailTemplate)
 		// Admin API Key 管理
-		adminSettings.GET("/admin-api-key", h.Admin.Setting.GetAdminAPIKey)
-		adminSettings.POST("/admin-api-key/regenerate", h.Admin.Setting.RegenerateAdminAPIKey)
-		adminSettings.DELETE("/admin-api-key", h.Admin.Setting.DeleteAdminAPIKey)
+		adminSettingsAdminOnly.GET("/admin-api-key", h.Admin.Setting.GetAdminAPIKey)
+		adminSettingsAdminOnly.POST("/admin-api-key/regenerate", h.Admin.Setting.RegenerateAdminAPIKey)
+		adminSettingsAdminOnly.DELETE("/admin-api-key", h.Admin.Setting.DeleteAdminAPIKey)
 		// 529过载冷却配置
-		adminSettings.GET("/overload-cooldown", h.Admin.Setting.GetOverloadCooldownSettings)
-		adminSettings.PUT("/overload-cooldown", h.Admin.Setting.UpdateOverloadCooldownSettings)
+		adminSettingsAdminOnly.GET("/overload-cooldown", h.Admin.Setting.GetOverloadCooldownSettings)
+		adminSettingsAdminOnly.PUT("/overload-cooldown", h.Admin.Setting.UpdateOverloadCooldownSettings)
 		// 429默认回避配置
-		adminSettings.GET("/rate-limit-429-cooldown", h.Admin.Setting.GetRateLimit429CooldownSettings)
-		adminSettings.PUT("/rate-limit-429-cooldown", h.Admin.Setting.UpdateRateLimit429CooldownSettings)
+		adminSettingsAdminOnly.GET("/rate-limit-429-cooldown", h.Admin.Setting.GetRateLimit429CooldownSettings)
+		adminSettingsAdminOnly.PUT("/rate-limit-429-cooldown", h.Admin.Setting.UpdateRateLimit429CooldownSettings)
 		// 流超时处理配置
-		adminSettings.GET("/stream-timeout", h.Admin.Setting.GetStreamTimeoutSettings)
-		adminSettings.PUT("/stream-timeout", h.Admin.Setting.UpdateStreamTimeoutSettings)
+		adminSettingsAdminOnly.GET("/stream-timeout", h.Admin.Setting.GetStreamTimeoutSettings)
+		adminSettingsAdminOnly.PUT("/stream-timeout", h.Admin.Setting.UpdateStreamTimeoutSettings)
 		// 请求整流器配置
-		adminSettings.GET("/rectifier", h.Admin.Setting.GetRectifierSettings)
-		adminSettings.PUT("/rectifier", h.Admin.Setting.UpdateRectifierSettings)
+		adminSettingsAdminOnly.GET("/rectifier", h.Admin.Setting.GetRectifierSettings)
+		adminSettingsAdminOnly.PUT("/rectifier", h.Admin.Setting.UpdateRectifierSettings)
 		// Beta 策略配置
-		adminSettings.GET("/beta-policy", h.Admin.Setting.GetBetaPolicySettings)
-		adminSettings.PUT("/beta-policy", h.Admin.Setting.UpdateBetaPolicySettings)
+		adminSettingsAdminOnly.GET("/beta-policy", h.Admin.Setting.GetBetaPolicySettings)
+		adminSettingsAdminOnly.PUT("/beta-policy", h.Admin.Setting.UpdateBetaPolicySettings)
 		// Web Search 模拟配置
-		adminSettings.GET("/web-search-emulation", h.Admin.Setting.GetWebSearchEmulationConfig)
-		adminSettings.PUT("/web-search-emulation", h.Admin.Setting.UpdateWebSearchEmulationConfig)
-		adminSettings.POST("/web-search-emulation/test", h.Admin.Setting.TestWebSearchEmulation)
-		adminSettings.POST("/web-search-emulation/reset-usage", h.Admin.Setting.ResetWebSearchUsage)
+		adminSettingsAdminOnly.GET("/web-search-emulation", h.Admin.Setting.GetWebSearchEmulationConfig)
+		adminSettingsAdminOnly.PUT("/web-search-emulation", h.Admin.Setting.UpdateWebSearchEmulationConfig)
+		adminSettingsAdminOnly.POST("/web-search-emulation/test", h.Admin.Setting.TestWebSearchEmulation)
+		adminSettingsAdminOnly.POST("/web-search-emulation/reset-usage", h.Admin.Setting.ResetWebSearchUsage)
 	}
 }
 
@@ -525,18 +525,17 @@ func registerSystemRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 
 func registerSubscriptionRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *handler.Handlers) {
 	subscriptions := admin.Group("/subscriptions")
-	subscriptionsAdminOnly := adminOnly.Group("/subscriptions")
 	{
 		subscriptions.GET("", h.Admin.Subscription.List)
 		subscriptions.GET("/:id", h.Admin.Subscription.GetByID)
 		subscriptions.GET("/:id/progress", h.Admin.Subscription.GetProgress)
 
-		// 订阅发放、延期、重置和撤销会改变用户权益，仅限管理员。
-		subscriptionsAdminOnly.POST("/assign", h.Admin.Subscription.Assign)
-		subscriptionsAdminOnly.POST("/bulk-assign", h.Admin.Subscription.BulkAssign)
-		subscriptionsAdminOnly.POST("/:id/extend", h.Admin.Subscription.Extend)
-		subscriptionsAdminOnly.POST("/:id/reset-quota", h.Admin.Subscription.ResetQuota)
-		subscriptionsAdminOnly.DELETE("/:id", h.Admin.Subscription.Revoke)
+		// 订阅发放、延期、重置和撤销属于运营资源分配，运营员可以执行。
+		subscriptions.POST("/assign", h.Admin.Subscription.Assign)
+		subscriptions.POST("/bulk-assign", h.Admin.Subscription.BulkAssign)
+		subscriptions.POST("/:id/extend", h.Admin.Subscription.Extend)
+		subscriptions.POST("/:id/reset-quota", h.Admin.Subscription.ResetQuota)
+		subscriptions.DELETE("/:id", h.Admin.Subscription.Revoke)
 	}
 
 	// 分组下的订阅列表

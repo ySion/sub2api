@@ -411,7 +411,7 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
-const canManagePromoCodes = computed(() => authStore.isAdmin)
+const canManagePromoCodes = computed(() => authStore.isBackoffice)
 
 // State
 const codes = ref<PromoCode[]>([])

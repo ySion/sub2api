@@ -780,7 +780,7 @@ const adminNavItems = computed((): NavItem[] => {
       children: [
         { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
         { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon },
-        { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon, adminOnly: true },
+        { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon },
       ],
     },
     { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon }
@@ -792,17 +792,21 @@ const adminNavItems = computed((): NavItem[] => {
   if (authStore.isSimpleMode) {
     const filtered = visible.filter(item => !item.hideInSimpleMode)
     filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
-    if (authStore.isAdmin) {
+    if (authStore.isBackoffice) {
       filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
-      for (const cm of customMenuItemsForAdmin.value) {
-        filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
+      if (authStore.isAdmin) {
+        for (const cm of customMenuItemsForAdmin.value) {
+          filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
+        }
       }
     }
     return filtered
   }
 
-  if (authStore.isAdmin) {
+  if (authStore.isBackoffice) {
     visible.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
+  }
+  if (authStore.isAdmin) {
     for (const cm of customMenuItemsForAdmin.value) {
       visible.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
     }
