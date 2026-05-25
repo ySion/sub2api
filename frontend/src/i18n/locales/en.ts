@@ -5214,7 +5214,7 @@ export default {
     // Settings
     settings: {
       title: 'System Settings',
-      description: 'Manage registration, email verification, default values, and SMTP settings',
+      description: 'Manage site presentation, login agreement, feature switches, and user defaults',
       tabs: {
         general: 'General',
         agreement: 'Agreement',

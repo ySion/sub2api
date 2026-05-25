@@ -5377,7 +5377,7 @@ export default {
     // Settings
     settings: {
       title: '系统设置',
-      description: '管理注册、邮箱验证、默认值和 SMTP 设置',
+      description: '管理站点展示、登录条款、功能开关和用户默认值',
       tabs: {
         general: '通用设置',
         agreement: '登录条款',

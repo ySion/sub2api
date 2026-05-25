@@ -202,7 +202,7 @@
         <!-- /Tab: Security — Admin API Key -->
 
         <!-- Tab: Gateway -->
-        <div v-show="activeTab === 'gateway'" class="space-y-6">
+        <div v-if="isAdmin" v-show="activeTab === 'gateway'" class="space-y-6">
           <!-- Overload Cooldown (529) Settings -->
           <div class="card">
             <div
@@ -3545,7 +3545,7 @@
         <!-- /Tab: Users -->
 
         <!-- Tab: Gateway — Claude Code, Scheduling -->
-        <div v-show="activeTab === 'gateway'" class="space-y-6">
+        <div v-if="isAdmin" v-show="activeTab === 'gateway'" class="space-y-6">
           <!-- Claude Code Settings -->
           <div class="card">
             <div
@@ -5536,7 +5536,7 @@
 
         <!-- Tab: Email -->
         <!-- Tab: Payment -->
-        <div v-show="activeTab === 'payment'" class="space-y-6">
+        <div v-if="isAdmin" v-show="activeTab === 'payment'" class="space-y-6">
           <!-- Payment System Settings -->
           <div class="card">
             <div
@@ -6050,7 +6050,7 @@
           />
         </div>
 
-        <div v-show="activeTab === 'email'" class="space-y-6">
+        <div v-if="isAdmin" v-show="activeTab === 'email'" class="space-y-6">
           <!-- Email disabled hint - show when email_verify_enabled is off -->
           <div v-if="!form.email_verify_enabled" class="card">
             <div class="p-6">
@@ -6472,7 +6472,7 @@
         <!-- /Tab: Email -->
 
         <!-- Tab: Backup -->
-        <div v-show="activeTab === 'backup'">
+        <div v-if="isAdmin" v-show="activeTab === 'backup'">
           <BackupSettings />
         </div>
 
@@ -6514,6 +6514,7 @@
 
       <!-- Provider dialogs placed outside the settings form to prevent form submission bubbling -->
       <PaymentProviderDialog
+        v-if="isAdmin"
         ref="providerDialogRef"
         :show="showProviderDialog"
         :saving="providerSaving"
@@ -6526,6 +6527,7 @@
         @save="handleSaveProvider"
       />
       <ConfirmDialog
+        v-if="isAdmin"
         :show="showDeleteProviderDialog"
         :title="t('admin.settings.payment.deleteProvider')"
         :message="t('admin.settings.payment.deleteProviderConfirm')"
