@@ -36,10 +36,11 @@
             >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
             </button>
-            <button @click="handleExportCodes" class="btn btn-secondary">
+            <button v-if="canManageRedeemCodes" @click="handleExportCodes" class="btn btn-secondary">
               {{ t('admin.redeem.exportCsv') }}
             </button>
             <button
+              v-if="canManageRedeemCodes"
               data-test="batch-update-open"
               @click="openBatchUpdateDialog"
               :disabled="selectedCount === 0 || batchUpdating"
@@ -48,7 +49,7 @@
               <Icon name="edit" size="md" class="mr-2" />
               {{ t('admin.redeem.batchUpdate') }}
             </button>
-            <button @click="showGenerateDialog = true" class="btn btn-primary">
+            <button v-if="canManageRedeemCodes" @click="showGenerateDialog = true" class="btn btn-primary">
               {{ t('admin.redeem.generateCodes') }}
             </button>
           </div>
@@ -184,7 +185,7 @@
           <template #cell-actions="{ row }">
             <div class="flex items-center space-x-2">
               <button
-                v-if="row.status === 'unused'"
+                v-if="canManageRedeemCodes && row.status === 'unused'"
                 @click="handleDelete(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
               >
@@ -206,7 +207,7 @@
 
       <template #pagination>
         <div
-          v-if="selectedCount > 0"
+          v-if="canManageRedeemCodes && selectedCount > 0"
           class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-primary-50 p-3 dark:bg-primary-900/20"
         >
           <span class="text-sm font-medium text-primary-900 dark:text-primary-100">
@@ -214,6 +215,7 @@
           </span>
           <div class="flex flex-wrap items-center gap-2">
             <button
+              v-if="canManageRedeemCodes"
               type="button"
               class="text-xs font-medium text-primary-700 hover:text-primary-800 dark:text-primary-300 dark:hover:text-primary-200"
               @click="clearSelectedCodes"
@@ -240,7 +242,7 @@
         />
 
         <!-- Batch Actions -->
-        <div v-if="filters.status === 'unused'" class="flex justify-end">
+        <div v-if="canManageRedeemCodes && filters.status === 'unused'" class="flex justify-end">
           <button @click="showDeleteUnusedDialog = true" class="btn btn-danger">
             {{ t('admin.redeem.deleteAllUnused') }}
           </button>
@@ -611,6 +613,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { useClipboard } from '@/composables/useClipboard'
 import { useTableSelection } from '@/composables/useTableSelection'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
@@ -637,6 +640,8 @@ import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const canManageRedeemCodes = computed(() => authStore.isAdmin)
 const { copyToClipboard: clipboardCopy } = useClipboard()
 
 interface GroupOption {
@@ -719,17 +724,22 @@ const downloadGeneratedCodes = () => {
   window.URL.revokeObjectURL(url)
 }
 
-const columns = computed<Column[]>(() => [
-  { key: 'select', label: '' },
-  { key: 'code', label: t('admin.redeem.columns.code') },
-  { key: 'type', label: t('admin.redeem.columns.type'), sortable: true },
-  { key: 'value', label: t('admin.redeem.columns.value'), sortable: true },
-  { key: 'status', label: t('admin.redeem.columns.status'), sortable: true },
-  { key: 'used_by', label: t('admin.redeem.columns.usedBy') },
-  { key: 'used_at', label: t('admin.redeem.columns.usedAt'), sortable: true },
-  { key: 'expires_at', label: t('admin.redeem.columns.expiresAt'), sortable: true },
-  { key: 'actions', label: t('admin.redeem.columns.actions') }
-])
+const columns = computed<Column[]>(() => {
+  const base: Column[] = [
+    { key: 'code', label: t('admin.redeem.columns.code') },
+    { key: 'type', label: t('admin.redeem.columns.type'), sortable: true },
+    { key: 'value', label: t('admin.redeem.columns.value'), sortable: true },
+    { key: 'status', label: t('admin.redeem.columns.status'), sortable: true },
+    { key: 'used_by', label: t('admin.redeem.columns.usedBy') },
+    { key: 'used_at', label: t('admin.redeem.columns.usedAt'), sortable: true },
+    { key: 'expires_at', label: t('admin.redeem.columns.expiresAt'), sortable: true }
+  ]
+  if (canManageRedeemCodes.value) {
+    base.unshift({ key: 'select', label: '' })
+    base.push({ key: 'actions', label: t('admin.redeem.columns.actions') })
+  }
+  return base
+})
 
 const typeOptions = computed(() => [
   { value: 'balance', label: t('admin.redeem.balance') },
@@ -1179,7 +1189,9 @@ const loadSubscriptionGroups = async () => {
 
 onMounted(() => {
   loadCodes()
-  loadSubscriptionGroups()
+  if (canManageRedeemCodes.value) {
+    loadSubscriptionGroups()
+  }
 })
 
 onUnmounted(() => {

@@ -207,6 +207,34 @@ func TestUsageLogFromService_PreservesHistoricalMissingImageSize(t *testing.T) {
 	require.NotContains(t, string(body), `"image_size":"2K"`)
 }
 
+func TestUsageLogFromServiceOperator_RedactsSensitiveAdminFields(t *testing.T) {
+	t.Parallel()
+
+	ip := "203.0.113.10"
+	accountCost := 0.42
+	log := &service.UsageLog{
+		RequestID:             "req_operator_redact",
+		Model:                 "claude-sonnet-4",
+		APIKeyID:              101,
+		AccountID:             202,
+		APIKey:                &service.APIKey{ID: 101, Key: "sk-secret", Name: "prod-key"},
+		Account:               &service.Account{ID: 202, Name: "upstream-account"},
+		IPAddress:             &ip,
+		AccountRateMultiplier: f64Ptr(1.5),
+		AccountStatsCost:      &accountCost,
+	}
+
+	dto := UsageLogFromServiceOperator(log)
+	require.NotNil(t, dto)
+	require.Equal(t, int64(0), dto.APIKeyID)
+	require.Nil(t, dto.APIKey)
+	require.Equal(t, int64(0), dto.AccountID)
+	require.Nil(t, dto.Account)
+	require.Nil(t, dto.IPAddress)
+	require.Nil(t, dto.AccountRateMultiplier)
+	require.Nil(t, dto.AccountStatsCost)
+}
+
 func f64Ptr(value float64) *float64 {
 	return &value
 }

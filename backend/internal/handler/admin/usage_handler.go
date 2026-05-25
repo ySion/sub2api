@@ -27,6 +27,22 @@ type UsageHandler struct {
 	cleanupService *service.UsageCleanupService
 }
 
+func isOperatorBackofficeRequest(c *gin.Context) bool {
+	role, ok := middleware.GetUserRoleFromContext(c)
+	return ok && role == service.RoleOperator
+}
+
+func rejectOperatorUsageSensitiveFilters(c *gin.Context) bool {
+	if !isOperatorBackofficeRequest(c) {
+		return false
+	}
+	if strings.TrimSpace(c.Query("api_key_id")) != "" || strings.TrimSpace(c.Query("account_id")) != "" {
+		response.Forbidden(c, "operator cannot filter usage by API key or account")
+		return true
+	}
+	return false
+}
+
 // NewUsageHandler creates a new admin usage handler
 func NewUsageHandler(
 	usageService *service.UsageService,
@@ -60,6 +76,11 @@ type CreateUsageCleanupTaskRequest struct {
 // List handles listing all usage records with filters
 // GET /api/v1/admin/usage
 func (h *UsageHandler) List(c *gin.Context) {
+	operatorRequest := isOperatorBackofficeRequest(c)
+	if rejectOperatorUsageSensitiveFilters(c) {
+		return
+	}
+
 	page, pageSize := response.ParsePagination(c)
 	exactTotal := false
 	if exactTotalRaw := strings.TrimSpace(c.Query("exact_total")); exactTotalRaw != "" {
@@ -194,7 +215,11 @@ func (h *UsageHandler) List(c *gin.Context) {
 
 	out := make([]dto.AdminUsageLog, 0, len(records))
 	for i := range records {
-		out = append(out, *dto.UsageLogFromServiceAdmin(&records[i]))
+		if operatorRequest {
+			out = append(out, *dto.UsageLogFromServiceOperator(&records[i]))
+		} else {
+			out = append(out, *dto.UsageLogFromServiceAdmin(&records[i]))
+		}
 	}
 	response.Paginated(c, out, result.Total, page, pageSize)
 }
@@ -202,6 +227,10 @@ func (h *UsageHandler) List(c *gin.Context) {
 // Stats handles getting usage statistics with filters
 // GET /api/v1/admin/usage/stats
 func (h *UsageHandler) Stats(c *gin.Context) {
+	if rejectOperatorUsageSensitiveFilters(c) {
+		return
+	}
+
 	// Parse filters - same as List endpoint
 	var userID, apiKeyID, accountID, groupID int64
 	if userIDStr := c.Query("user_id"); userIDStr != "" {

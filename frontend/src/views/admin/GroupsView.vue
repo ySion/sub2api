@@ -61,6 +61,7 @@
               />
             </button>
             <button
+              v-if="canManageGroups"
               @click="openSortModal"
               class="btn btn-secondary"
               :title="t('admin.groups.sortOrder')"
@@ -69,6 +70,7 @@
               {{ t("admin.groups.sortOrder") }}
             </button>
             <button
+              v-if="canManageGroups"
               @click="showCreateModal = true"
               class="btn btn-primary"
               data-tour="groups-create-btn"
@@ -288,7 +290,7 @@
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1">
+            <div v-if="canManageGroups" class="flex items-center gap-1">
               <button
                 @click="handleEdit(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
@@ -328,7 +330,7 @@
             <EmptyState
               :title="t('admin.groups.noGroupsYet')"
               :description="t('admin.groups.createFirstGroup')"
-              :action-text="t('admin.groups.createGroup')"
+              :action-text="canManageGroups ? t('admin.groups.createGroup') : undefined"
               @action="showCreateModal = true"
             />
           </template>
@@ -2834,6 +2836,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
+import { useAuthStore } from "@/stores/auth";
 import { useOnboardingStore } from "@/stores/onboarding";
 import { adminAPI } from "@/api/admin";
 import type { AdminGroup, GroupPlatform, SubscriptionType } from "@/types";
@@ -2866,44 +2869,51 @@ import { normalizeSupportedModelScopesForPlatform } from "./groupsSupportedModel
 
 const { t } = useI18n();
 const appStore = useAppStore();
+const authStore = useAuthStore();
 const onboardingStore = useOnboardingStore();
+const canManageGroups = computed(() => authStore.isAdmin);
 
-const columns = computed<Column[]>(() => [
-  { key: "name", label: t("admin.groups.columns.name"), sortable: true },
-  {
-    key: "platform",
-    label: t("admin.groups.columns.platform"),
-    sortable: true,
-  },
-  {
-    key: "billing_type",
-    label: t("admin.groups.columns.billingType"),
-    sortable: true,
-  },
-  {
-    key: "rate_multiplier",
-    label: t("admin.groups.columns.rateMultiplier"),
-    sortable: true,
-  },
-  {
-    key: "is_exclusive",
-    label: t("admin.groups.columns.type"),
-    sortable: true,
-  },
-  {
-    key: "account_count",
-    label: t("admin.groups.columns.accounts"),
-    sortable: true,
-  },
-  {
-    key: "capacity",
-    label: t("admin.groups.columns.capacity"),
-    sortable: false,
-  },
-  { key: "usage", label: t("admin.groups.columns.usage"), sortable: false },
-  { key: "status", label: t("admin.groups.columns.status"), sortable: true },
-  { key: "actions", label: t("admin.groups.columns.actions"), sortable: false },
-]);
+const columns = computed<Column[]>(() => {
+  const base: Column[] = [
+    { key: "name", label: t("admin.groups.columns.name"), sortable: true },
+    {
+      key: "platform",
+      label: t("admin.groups.columns.platform"),
+      sortable: true,
+    },
+    {
+      key: "billing_type",
+      label: t("admin.groups.columns.billingType"),
+      sortable: true,
+    },
+    {
+      key: "rate_multiplier",
+      label: t("admin.groups.columns.rateMultiplier"),
+      sortable: true,
+    },
+    {
+      key: "is_exclusive",
+      label: t("admin.groups.columns.type"),
+      sortable: true,
+    },
+    {
+      key: "account_count",
+      label: t("admin.groups.columns.accounts"),
+      sortable: true,
+    },
+    {
+      key: "capacity",
+      label: t("admin.groups.columns.capacity"),
+      sortable: false,
+    },
+    { key: "usage", label: t("admin.groups.columns.usage"), sortable: false },
+    { key: "status", label: t("admin.groups.columns.status"), sortable: true },
+  ];
+  if (canManageGroups.value) {
+    base.push({ key: "actions", label: t("admin.groups.columns.actions"), sortable: false });
+  }
+  return base;
+});
 
 // Filter options
 const statusOptions = computed(() => [

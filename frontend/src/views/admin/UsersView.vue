@@ -29,6 +29,7 @@
                 :options="[
                   { value: '', label: t('admin.users.allRoles') },
                   { value: 'admin', label: t('admin.users.admin') },
+                  { value: 'operator', label: t('admin.users.roles.operator') },
                   { value: 'user', label: t('admin.users.user') }
                 ]"
                 @change="applyFilter"
@@ -222,6 +223,7 @@
               </div>
               <!-- Attributes Config Button -->
               <button
+                v-if="canManageUsers"
                 @click="showAttributesModal = true"
                 class="btn btn-secondary px-2 md:px-3"
                 :title="t('admin.users.attributes.configButton')"
@@ -232,7 +234,7 @@
             </div>
 
             <!-- Create User Button (full width on mobile, auto width on desktop) -->
-            <button @click="showCreateModal = true" class="btn btn-primary flex-1 md:flex-initial">
+            <button v-if="canManageUsers" @click="showCreateModal = true" class="btn btn-primary flex-1 md:flex-initial">
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.users.createUser') }}
             </button>
@@ -246,7 +248,7 @@
           :columns="columns"
           :data="sortedUsers"
           :loading="loading"
-          :actions-count="7"
+          :actions-count="canManageUsers ? 7 : 0"
           :server-side-sort="true"
           default-sort-key="created_at"
           default-sort-order="desc"
@@ -411,6 +413,7 @@
                 </div>
               </div>
               <button
+                v-if="canManageUsers"
                 @click.stop="handleDeposit(row)"
                 class="rounded px-2 py-0.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                 :title="t('admin.users.deposit')"
@@ -564,6 +567,7 @@
             <div class="flex items-center gap-1">
               <!-- Edit Button -->
               <button
+                v-if="canManageUsers"
                 @click="handleEdit(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
@@ -573,7 +577,7 @@
 
               <!-- Toggle Status Button (not for admin) -->
               <button
-                v-if="row.role !== 'admin'"
+                v-if="canManageUsers && row.role !== 'admin'"
                 @click="handleToggleStatus(row)"
                 :class="[
                   'flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors',
@@ -589,6 +593,7 @@
 
               <!-- More Actions Menu Trigger -->
               <button
+                v-if="canManageUsers"
                 @click="openActionMenu(row, $event)"
                 class="action-menu-trigger flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-dark-700 dark:hover:text-white"
                 :class="{ 'bg-gray-100 text-gray-900 dark:bg-dark-700 dark:text-white': activeMenuId === row.id }"
@@ -603,7 +608,7 @@
             <EmptyState
               :title="t('admin.users.noUsersYet')"
               :description="t('admin.users.createFirstUser')"
-              :action-text="t('admin.users.createUser')"
+              :action-text="canManageUsers ? t('admin.users.createUser') : undefined"
               @action="showCreateModal = true"
             />
           </template>
@@ -705,7 +710,7 @@
     <UserApiKeysModal :show="showApiKeysModal" :user="viewingUser" @close="closeApiKeysModal" />
     <UserAllowedGroupsModal :show="showAllowedGroupsModal" :user="allowedGroupsUser" @close="closeAllowedGroupsModal" @success="loadUsers" />
     <UserBalanceModal :show="showBalanceModal" :user="balanceUser" :operation="balanceOperation" @close="closeBalanceModal" @success="loadUsers" />
-    <UserBalanceHistoryModal :show="showBalanceHistoryModal" :user="balanceHistoryUser" @close="closeBalanceHistoryModal" @deposit="handleDepositFromHistory" @withdraw="handleWithdrawFromHistory" />
+    <UserBalanceHistoryModal :show="showBalanceHistoryModal" :user="balanceHistoryUser" :hide-actions="!canManageUsers" @close="closeBalanceHistoryModal" @deposit="handleDepositFromHistory" @withdraw="handleWithdrawFromHistory" />
     <GroupReplaceModal :show="showGroupReplaceModal" :user="groupReplaceUser" :old-group="groupReplaceOldGroup" :all-groups="allGroups" @close="closeGroupReplaceModal" @success="loadUsers" />
     <UserAttributesConfigModal :show="showAttributesModal" @close="handleAttributesModalClose" />
   </AppLayout>
@@ -715,6 +720,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatDateTime } from '@/utils/format'
 import Icon from '@/components/icons/Icon.vue'
@@ -745,6 +751,8 @@ import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryM
 import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const canManageUsers = computed(() => authStore.isAdmin)
 
 // Generate dynamic attribute columns from enabled definitions
 const attributeColumns = computed<Column[]>(() =>
@@ -793,29 +801,38 @@ const getAttributeValue = (userId: number, attrId: number): string => {
 }
 
 // All possible columns (for column settings)
-const allColumns = computed<Column[]>(() => [
-  { key: 'email', label: t('admin.users.columns.user'), sortable: true },
-  { key: 'id', label: t('admin.users.columns.id'), sortable: true },
-  { key: 'username', label: t('admin.users.columns.username'), sortable: true },
-  { key: 'notes', label: t('admin.users.columns.notes'), sortable: false },
-  // Dynamic attribute columns
-  ...attributeColumns.value,
-  { key: 'role', label: t('admin.users.columns.role'), sortable: true },
-  { key: 'groups', label: t('admin.users.columns.groups'), sortable: false },
-  { key: 'subscriptions', label: t('admin.users.columns.subscriptions'), sortable: false },
-  { key: 'balance', label: t('admin.users.columns.balance'), sortable: true },
-  { key: 'usage', label: t('admin.users.columns.usage'), sortable: false },
-  { key: 'usage_anthropic', label: t('admin.users.columns.usageAnthropic'), sortable: false },
-  { key: 'usage_openai', label: t('admin.users.columns.usageOpenAI'), sortable: false },
-  { key: 'usage_gemini', label: t('admin.users.columns.usageGemini'), sortable: false },
-  { key: 'usage_antigravity', label: t('admin.users.columns.usageAntigravity'), sortable: false },
-  { key: 'concurrency', label: t('admin.users.columns.concurrency'), sortable: true },
-  { key: 'status', label: t('admin.users.columns.status'), sortable: true },
-  { key: 'last_active_at', label: t('admin.users.columns.lastActive'), sortable: true },
-  { key: 'last_used_at', label: t('admin.users.columns.lastUsed'), sortable: true },
-  { key: 'created_at', label: t('admin.users.columns.created'), sortable: true },
-  { key: 'actions', label: t('admin.users.columns.actions'), sortable: false }
-])
+const allColumns = computed<Column[]>(() => {
+  const base: Column[] = [
+    { key: 'email', label: t('admin.users.columns.user'), sortable: true },
+    { key: 'id', label: t('admin.users.columns.id'), sortable: true },
+    { key: 'username', label: t('admin.users.columns.username'), sortable: true },
+  ]
+  if (canManageUsers.value) {
+    base.push({ key: 'notes', label: t('admin.users.columns.notes'), sortable: false })
+  }
+  base.push(
+    // Dynamic attribute columns
+    ...attributeColumns.value,
+    { key: 'role', label: t('admin.users.columns.role'), sortable: true },
+    { key: 'groups', label: t('admin.users.columns.groups'), sortable: false },
+    { key: 'subscriptions', label: t('admin.users.columns.subscriptions'), sortable: false },
+    { key: 'balance', label: t('admin.users.columns.balance'), sortable: true },
+    { key: 'usage', label: t('admin.users.columns.usage'), sortable: false },
+    { key: 'usage_anthropic', label: t('admin.users.columns.usageAnthropic'), sortable: false },
+    { key: 'usage_openai', label: t('admin.users.columns.usageOpenAI'), sortable: false },
+    { key: 'usage_gemini', label: t('admin.users.columns.usageGemini'), sortable: false },
+    { key: 'usage_antigravity', label: t('admin.users.columns.usageAntigravity'), sortable: false },
+    { key: 'concurrency', label: t('admin.users.columns.concurrency'), sortable: true },
+    { key: 'status', label: t('admin.users.columns.status'), sortable: true },
+    { key: 'last_active_at', label: t('admin.users.columns.lastActive'), sortable: true },
+    { key: 'last_used_at', label: t('admin.users.columns.lastUsed'), sortable: true },
+    { key: 'created_at', label: t('admin.users.columns.created'), sortable: true }
+  )
+  if (canManageUsers.value) {
+    base.push({ key: 'actions', label: t('admin.users.columns.actions'), sortable: false })
+  }
+  return base
+})
 
 // Columns that can be toggled (exclude email and actions which are always visible)
 const toggleableColumns = computed(() =>

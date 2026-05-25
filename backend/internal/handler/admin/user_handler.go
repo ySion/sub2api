@@ -141,10 +141,15 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	// Build response with concurrency info
+	operatorRequest := isOperatorBackofficeRequest(c)
 	out := make([]UserWithConcurrency, len(users))
 	for i := range users {
+		adminUser := dto.UserFromServiceAdmin(&users[i])
+		if operatorRequest {
+			adminUser = dto.UserFromServiceOperator(&users[i])
+		}
 		out[i] = UserWithConcurrency{
-			AdminUser: *dto.UserFromServiceAdmin(&users[i]),
+			AdminUser: *adminUser,
 		}
 		if info := loadInfo[users[i].ID]; info != nil {
 			out[i].CurrentConcurrency = info.CurrentConcurrency
@@ -192,6 +197,10 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 		return
 	}
 
+	if isOperatorBackofficeRequest(c) {
+		response.Success(c, dto.UserFromServiceOperator(user))
+		return
+	}
 	response.Success(c, dto.UserFromServiceAdmin(user))
 }
 

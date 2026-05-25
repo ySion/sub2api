@@ -64,7 +64,7 @@
           <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
         </div>
       </div>
-      <UsageFilters v-model="filters" :start-date="startDate" :end-date="endDate" :exporting="exporting" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
+      <UsageFilters v-model="filters" :start-date="startDate" :end-date="endDate" :exporting="exporting" :show-cleanup="canUseSensitiveUsageControls" :show-api-key-filter="canUseSensitiveUsageControls" :show-account-filter="canUseSensitiveUsageControls" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
         <template #after-reset>
           <div class="relative" ref="columnDropdownRef">
             <button
@@ -135,7 +135,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
 import { useRoute } from 'vue-router'
-import { useAppStore } from '@/stores/app'; import { adminAPI } from '@/api/admin'; import { adminUsageAPI } from '@/api/admin/usage'
+import { useAppStore } from '@/stores/app'; import { useAuthStore } from '@/stores/auth'; import { adminAPI } from '@/api/admin'; import { adminUsageAPI } from '@/api/admin/usage'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatReasoningEffort } from '@/utils/format'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
@@ -151,6 +151,8 @@ import type { AdminUsageLog, TrendDataPoint, ModelStat, GroupStat, EndpointStat,
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const canUseSensitiveUsageControls = computed(() => authStore.isAdmin)
 type DistributionMetric = 'tokens' | 'actual_cost'
 type EndpointSource = 'inbound' | 'upstream' | 'path'
 type ModelDistributionSource = 'requested' | 'upstream' | 'mapping'
@@ -521,24 +523,29 @@ const ALWAYS_VISIBLE = ['user', 'created_at']
 const DEFAULT_HIDDEN_COLUMNS = ['reasoning_effort', 'user_agent']
 const HIDDEN_COLUMNS_KEY = 'usage-hidden-columns'
 
-const allColumns = computed(() => [
-  { key: 'user', label: t('admin.usage.user'), sortable: false },
-  { key: 'api_key', label: t('usage.apiKeyFilter'), sortable: false },
-  { key: 'account', label: t('admin.usage.account'), sortable: false },
-  { key: 'model', label: t('usage.model'), sortable: true },
-  { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
-  { key: 'endpoint', label: t('usage.endpoint'), sortable: false },
-  { key: 'group', label: t('admin.usage.group'), sortable: false },
-  { key: 'stream', label: t('usage.type'), sortable: false },
-  { key: 'billing_mode', label: t('admin.usage.billingMode'), sortable: false },
-  { key: 'tokens', label: t('usage.tokens'), sortable: false },
-  { key: 'cost', label: t('usage.cost'), sortable: false },
-  { key: 'first_token', label: t('usage.firstToken'), sortable: false },
-  { key: 'duration', label: t('usage.duration'), sortable: false },
-  { key: 'created_at', label: t('usage.time'), sortable: true },
-  { key: 'user_agent', label: t('usage.userAgent'), sortable: false },
-  { key: 'ip_address', label: t('admin.usage.ipAddress'), sortable: false }
-])
+const allColumns = computed(() => {
+  const base = [
+    { key: 'user', label: t('admin.usage.user'), sortable: false },
+    { key: 'model', label: t('usage.model'), sortable: true },
+    { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
+    { key: 'endpoint', label: t('usage.endpoint'), sortable: false },
+    { key: 'group', label: t('admin.usage.group'), sortable: false },
+    { key: 'stream', label: t('usage.type'), sortable: false },
+    { key: 'billing_mode', label: t('admin.usage.billingMode'), sortable: false },
+    { key: 'tokens', label: t('usage.tokens'), sortable: false },
+    { key: 'cost', label: t('usage.cost'), sortable: false },
+    { key: 'first_token', label: t('usage.firstToken'), sortable: false },
+    { key: 'duration', label: t('usage.duration'), sortable: false },
+    { key: 'created_at', label: t('usage.time'), sortable: true },
+    { key: 'user_agent', label: t('usage.userAgent'), sortable: false }
+  ]
+  if (canUseSensitiveUsageControls.value) {
+    base.splice(1, 0, { key: 'api_key', label: t('usage.apiKeyFilter'), sortable: false })
+    base.splice(2, 0, { key: 'account', label: t('admin.usage.account'), sortable: false })
+    base.push({ key: 'ip_address', label: t('admin.usage.ipAddress'), sortable: false })
+  }
+  return base
+})
 
 const hiddenColumns = reactive<Set<string>>(new Set())
 

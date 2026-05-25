@@ -1881,6 +1881,7 @@ export default {
       deleteConfirm: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
       roles: {
         admin: '管理员',
+        operator: '运营员',
         user: '用户'
       },
       form: {

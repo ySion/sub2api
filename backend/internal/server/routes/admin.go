@@ -46,8 +46,8 @@ func RegisterAdminRoutes(
 		// 代理管理
 		registerProxyRoutes(adminOnly, h)
 
-		// 卡密管理
-		registerRedeemCodeRoutes(adminOnly, h)
+		// 卡密管理：运营员可查看，生成/导出/修改仍限管理员。
+		registerRedeemCodeRoutes(admin, adminOnly, h)
 
 		// 优惠码管理
 		registerPromoCodeRoutes(admin, h)
@@ -97,8 +97,8 @@ func RegisterAdminRoutes(
 		// 风控中心
 		registerContentModerationRoutes(adminOnly, h)
 
-		// 邀请返利（专属用户管理）
-		registerAffiliateRoutes(admin, h)
+		// 邀请返利：记录查询开放给运营员，专属用户配置仍限管理员。
+		registerAffiliateRoutes(admin, adminOnly, h)
 	}
 }
 
@@ -391,19 +391,23 @@ func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-func registerRedeemCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+func registerRedeemCodeRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *handler.Handlers) {
 	codes := admin.Group("/redeem-codes")
+	codesAdminOnly := adminOnly.Group("/redeem-codes")
 	{
 		codes.GET("", h.Admin.Redeem.List)
 		codes.GET("/stats", h.Admin.Redeem.GetStats)
-		codes.GET("/export", h.Admin.Redeem.Export)
+
+		// 卡密导出、生成和状态变更会泄露或改变用户权益，仅限管理员。
+		codesAdminOnly.GET("/export", h.Admin.Redeem.Export)
+		codesAdminOnly.POST("/create-and-redeem", h.Admin.Redeem.CreateAndRedeem)
+		codesAdminOnly.POST("/generate", h.Admin.Redeem.Generate)
+		codesAdminOnly.POST("/batch-delete", h.Admin.Redeem.BatchDelete)
+		codesAdminOnly.POST("/batch-update", h.Admin.Redeem.BatchUpdate)
+
 		codes.GET("/:id", h.Admin.Redeem.GetByID)
-		codes.POST("/create-and-redeem", h.Admin.Redeem.CreateAndRedeem)
-		codes.POST("/generate", h.Admin.Redeem.Generate)
-		codes.DELETE("/:id", h.Admin.Redeem.Delete)
-		codes.POST("/batch-delete", h.Admin.Redeem.BatchDelete)
-		codes.POST("/batch-update", h.Admin.Redeem.BatchUpdate)
-		codes.POST("/:id/expire", h.Admin.Redeem.Expire)
+		codesAdminOnly.DELETE("/:id", h.Admin.Redeem.Delete)
+		codesAdminOnly.POST("/:id/expire", h.Admin.Redeem.Expire)
 	}
 }
 
@@ -546,9 +550,9 @@ func registerUsageRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *
 		usage.GET("", h.Admin.Usage.List)
 		usage.GET("/stats", h.Admin.Usage.Stats)
 		usage.GET("/search-users", h.Admin.Usage.SearchUsers)
-		usage.GET("/search-api-keys", h.Admin.Usage.SearchAPIKeys)
 
-		// 清理任务属于数据管理操作，仅限管理员。
+		// API Key 发现和清理任务属于敏感数据/数据管理操作，仅限管理员。
+		usageAdminOnly.GET("/search-api-keys", h.Admin.Usage.SearchAPIKeys)
 		usageAdminOnly.GET("/cleanup-tasks", h.Admin.Usage.ListCleanupTasks)
 		usageAdminOnly.POST("/cleanup-tasks", h.Admin.Usage.CreateCleanupTask)
 		usageAdminOnly.POST("/cleanup-tasks/:id/cancel", h.Admin.Usage.CancelCleanupTask)
@@ -638,15 +642,16 @@ func registerChannelMonitorRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
-// registerAffiliateRoutes 注册邀请返利的管理端路由（专属用户配置）
-func registerAffiliateRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+// registerAffiliateRoutes 注册邀请返利的管理端路由。
+func registerAffiliateRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *handler.Handlers) {
 	affiliates := admin.Group("/affiliates")
+	affiliatesAdminOnly := adminOnly.Group("/affiliates")
 	{
 		affiliates.GET("/invites", h.Admin.Affiliate.ListInviteRecords)
 		affiliates.GET("/rebates", h.Admin.Affiliate.ListRebateRecords)
 		affiliates.GET("/transfers", h.Admin.Affiliate.ListTransferRecords)
 
-		users := affiliates.Group("/users")
+		users := affiliatesAdminOnly.Group("/users")
 		{
 			users.GET("", h.Admin.Affiliate.ListUsers)
 			users.GET("/lookup", h.Admin.Affiliate.LookupUsers)

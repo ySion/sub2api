@@ -153,13 +153,14 @@
               </div>
             </div>
             <button
+              v-if="canManageSubscriptions"
               @click="showGuideModal = true"
               class="btn btn-secondary"
               :title="t('admin.subscriptions.guide.showGuide')"
             >
               <Icon name="questionCircle" size="md" />
             </button>
-            <button @click="showAssignModal = true" class="btn btn-primary">
+            <button v-if="canManageSubscriptions" @click="showAssignModal = true" class="btn btn-primary">
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.subscriptions.assignSubscription') }}
             </button>
@@ -378,7 +379,7 @@
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="flex items-center gap-1">
+            <div v-if="canManageSubscriptions" class="flex items-center gap-1">
               <button
                 v-if="row.status === 'active' || row.status === 'expired'"
                 @click="handleExtend(row)"
@@ -411,7 +412,7 @@
             <EmptyState
               :title="t('admin.subscriptions.noSubscriptionsYet')"
               :description="t('admin.subscriptions.assignFirstSubscription')"
-              :action-text="t('admin.subscriptions.assignSubscription')"
+              :action-text="canManageSubscriptions ? t('admin.subscriptions.assignSubscription') : undefined"
               @action="showAssignModal = true"
             />
           </template>
@@ -741,6 +742,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
 import type { UserSubscription, Group, GroupPlatform, SubscriptionType } from '@/types'
 import type { SimpleUser } from '@/api/admin/usage'
@@ -762,6 +764,8 @@ import { getRemainingDurationParts, isOneTimeDailyQuota, type RemainingDurationP
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const canManageSubscriptions = computed(() => authStore.isAdmin)
 
 interface GroupOption {
   value: number
@@ -810,20 +814,25 @@ const setUserColumnMode = (mode: 'email' | 'username') => {
 }
 
 // All available columns
-const allColumns = computed<Column[]>(() => [
-  {
-    key: 'user',
-    label: userColumnMode.value === 'email'
-      ? t('admin.subscriptions.columns.user')
-      : t('admin.users.columns.username'),
-    sortable: false
-  },
-  { key: 'group', label: t('admin.subscriptions.columns.group'), sortable: false },
-  { key: 'usage', label: t('admin.subscriptions.columns.usage'), sortable: false },
-  { key: 'expires_at', label: t('admin.subscriptions.columns.expires'), sortable: true },
-  { key: 'status', label: t('admin.subscriptions.columns.status'), sortable: true },
-  { key: 'actions', label: t('admin.subscriptions.columns.actions'), sortable: false }
-])
+const allColumns = computed<Column[]>(() => {
+  const base: Column[] = [
+    {
+      key: 'user',
+      label: userColumnMode.value === 'email'
+        ? t('admin.subscriptions.columns.user')
+        : t('admin.users.columns.username'),
+      sortable: false
+    },
+    { key: 'group', label: t('admin.subscriptions.columns.group'), sortable: false },
+    { key: 'usage', label: t('admin.subscriptions.columns.usage'), sortable: false },
+    { key: 'expires_at', label: t('admin.subscriptions.columns.expires'), sortable: true },
+    { key: 'status', label: t('admin.subscriptions.columns.status'), sortable: true }
+  ]
+  if (canManageSubscriptions.value) {
+    base.push({ key: 'actions', label: t('admin.subscriptions.columns.actions'), sortable: false })
+  }
+  return base
+})
 
 // Columns that can be toggled (exclude user and actions which are always visible)
 const toggleableColumns = computed(() =>

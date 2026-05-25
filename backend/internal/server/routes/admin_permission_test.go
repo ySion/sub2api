@@ -16,15 +16,49 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAdminPermissionRoutesAllowOperatorOnOperationalRoute(t *testing.T) {
-	svc := &adminPermissionRouteService{}
-	router := newAdminPermissionRouteRouter(service.RoleOperator, svc)
+func TestAdminPermissionRoutesAllowOperatorOnOperationalRoutes(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		path       string
+		assertCall func(t *testing.T, svc *adminPermissionRouteService)
+	}{
+		{name: "announcements", path: "/api/v1/admin/announcements"},
+		{
+			name: "users",
+			path: "/api/v1/admin/users",
+			assertCall: func(t *testing.T, svc *adminPermissionRouteService) {
+				require.True(t, svc.listUsersCalled)
+			},
+		},
+		{
+			name: "groups",
+			path: "/api/v1/admin/groups",
+			assertCall: func(t *testing.T, svc *adminPermissionRouteService) {
+				require.True(t, svc.listGroupsCalled)
+			},
+		},
+		{
+			name: "redeem_codes",
+			path: "/api/v1/admin/redeem-codes",
+			assertCall: func(t *testing.T, svc *adminPermissionRouteService) {
+				require.True(t, svc.listRedeemCodesCalled)
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := &adminPermissionRouteService{}
+			router := newAdminPermissionRouteRouter(service.RoleOperator, svc)
 
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/announcements", nil)
-	router.ServeHTTP(w, req)
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			router.ServeHTTP(w, req)
 
-	require.Equal(t, http.StatusOK, w.Code)
+			require.Equal(t, http.StatusOK, w.Code)
+			if tc.assertCall != nil {
+				tc.assertCall(t, svc)
+			}
+		})
+	}
 }
 
 func TestAdminPermissionRoutesRejectOperatorOnSensitiveRoutes(t *testing.T) {
@@ -39,10 +73,14 @@ func TestAdminPermissionRoutesRejectOperatorOnSensitiveRoutes(t *testing.T) {
 		{name: "user_api_keys", method: http.MethodGet, path: "/api/v1/admin/users/1/api-keys"},
 		{name: "user_role", method: http.MethodPut, path: "/api/v1/admin/users/1/role"},
 		{name: "group_api_keys", method: http.MethodGet, path: "/api/v1/admin/groups/1/api-keys"},
-		{name: "redeem_codes", method: http.MethodGet, path: "/api/v1/admin/redeem-codes"},
 		{name: "redeem_codes_export", method: http.MethodGet, path: "/api/v1/admin/redeem-codes/export"},
 		{name: "redeem_codes_generate", method: http.MethodPost, path: "/api/v1/admin/redeem-codes/generate"},
 		{name: "redeem_codes_create_and_redeem", method: http.MethodPost, path: "/api/v1/admin/redeem-codes/create-and-redeem"},
+		{name: "redeem_codes_delete", method: http.MethodDelete, path: "/api/v1/admin/redeem-codes/1"},
+		{name: "redeem_codes_batch_delete", method: http.MethodPost, path: "/api/v1/admin/redeem-codes/batch-delete"},
+		{name: "redeem_codes_batch_update", method: http.MethodPost, path: "/api/v1/admin/redeem-codes/batch-update"},
+		{name: "usage_search_api_keys", method: http.MethodGet, path: "/api/v1/admin/usage/search-api-keys"},
+		{name: "affiliate_user_config", method: http.MethodGet, path: "/api/v1/admin/affiliates/users"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := &adminPermissionRouteService{}
@@ -55,6 +93,7 @@ func TestAdminPermissionRoutesRejectOperatorOnSensitiveRoutes(t *testing.T) {
 			require.Equal(t, http.StatusForbidden, w.Code)
 			require.False(t, svc.listAccountsCalled)
 			require.False(t, svc.listProxiesCalled)
+			require.False(t, svc.listRedeemCodesCalled)
 		})
 	}
 }
@@ -116,7 +155,9 @@ func newAdminPermissionRouteRouter(role string, svc *adminPermissionRouteService
 			Proxy:         adminhandler.NewProxyHandler(svc),
 			Redeem:        adminhandler.NewRedeemHandler(svc, nil),
 			Setting:       adminhandler.NewSettingHandler(nil, nil, nil, nil, nil, nil, nil),
+			Usage:         adminhandler.NewUsageHandler(nil, nil, svc, nil),
 			UserAttribute: adminhandler.NewUserAttributeHandler(nil),
+			Affiliate:     adminhandler.NewAffiliateHandler(nil, svc),
 		},
 	}
 
@@ -124,9 +165,11 @@ func newAdminPermissionRouteRouter(role string, svc *adminPermissionRouteService
 	registerUserManagementRoutes(admin, adminOnly, h)
 	registerGroupRoutes(admin, adminOnly, h)
 	registerAccountRoutes(adminOnly, h)
-	registerRedeemCodeRoutes(adminOnly, h)
+	registerRedeemCodeRoutes(admin, adminOnly, h)
 	registerProxyRoutes(adminOnly, h)
 	registerSettingsRoutes(adminOnly, h)
+	registerUsageRoutes(admin, adminOnly, h)
+	registerAffiliateRoutes(admin, adminOnly, h)
 
 	return router
 }
@@ -134,14 +177,26 @@ func newAdminPermissionRouteRouter(role string, svc *adminPermissionRouteService
 type adminPermissionRouteService struct {
 	service.AdminService
 
-	listGroupsCalled   bool
-	listAccountsCalled bool
-	listProxiesCalled  bool
+	listUsersCalled       bool
+	listGroupsCalled      bool
+	listAccountsCalled    bool
+	listProxiesCalled     bool
+	listRedeemCodesCalled bool
+}
+
+func (s *adminPermissionRouteService) ListUsers(ctx context.Context, page, pageSize int, filters service.UserListFilters, sortBy, sortOrder string) ([]service.User, int64, error) {
+	s.listUsersCalled = true
+	return []service.User{}, 0, nil
 }
 
 func (s *adminPermissionRouteService) ListGroups(ctx context.Context, page, pageSize int, platform, status, search string, isExclusive *bool, sortBy, sortOrder string) ([]service.Group, int64, error) {
 	s.listGroupsCalled = true
 	return []service.Group{}, 0, nil
+}
+
+func (s *adminPermissionRouteService) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string, sortBy, sortOrder string) ([]service.RedeemCode, int64, error) {
+	s.listRedeemCodesCalled = true
+	return []service.RedeemCode{}, 0, nil
 }
 
 func (s *adminPermissionRouteService) ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode string, sortBy, sortOrder string) ([]service.Account, int64, error) {

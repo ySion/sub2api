@@ -42,7 +42,7 @@
         </div>
 
         <!-- API Key Search -->
-        <div ref="apiKeySearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[240px]">
+        <div v-if="showApiKeyFilter" ref="apiKeySearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[240px]">
           <label class="input-label">{{ t('usage.apiKeyFilter') }}</label>
           <input
             v-model="apiKeyKeyword"
@@ -85,7 +85,7 @@
         </div>
 
         <!-- Account Filter -->
-        <div ref="accountSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[220px]">
+        <div v-if="showAccountFilter" ref="accountSearchRef" class="usage-filter-dropdown relative w-full sm:w-auto sm:min-w-[220px]">
           <label class="input-label">{{ t('admin.usage.account') }}</label>
           <input
             v-model="accountKeyword"
@@ -156,7 +156,7 @@
           {{ t('common.reset') }}
         </button>
         <slot name="after-reset" />
-        <button type="button" @click="$emit('cleanup')" class="btn btn-danger">
+        <button v-if="showCleanup" type="button" @click="$emit('cleanup')" class="btn btn-danger">
           {{ t('admin.usage.cleanup.button') }}
         </button>
         <button type="button" @click="$emit('export')" :disabled="exporting" class="btn btn-primary">
@@ -182,10 +182,16 @@ interface Props {
   startDate: string
   endDate: string
   showActions?: boolean
+  showCleanup?: boolean
+  showApiKeyFilter?: boolean
+  showAccountFilter?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  showActions: true
+  showActions: true,
+  showCleanup: true,
+  showApiKeyFilter: true,
+  showAccountFilter: true
 })
 const emit = defineEmits([
   'update:modelValue',
@@ -282,11 +288,13 @@ const selectUser = async (u: SimpleUser) => {
   filters.value.user_id = u.id
   clearApiKey()
 
-  // Auto-load API keys for this user
-  try {
-    apiKeyResults.value = await adminAPI.usage.searchApiKeys(u.id, '')
-  } catch {
-    apiKeyResults.value = []
+  // Auto-load API keys for this user only when the API key filter is visible.
+  if (props.showApiKeyFilter) {
+    try {
+      apiKeyResults.value = await adminAPI.usage.searchApiKeys(u.id, '')
+    } catch {
+      apiKeyResults.value = []
+    }
   }
 
   emitChange()
@@ -352,6 +360,7 @@ const clearAccount = () => {
 }
 
 const onApiKeyFocus = () => {
+  if (!props.showApiKeyFilter) return
   showApiKeyDropdown.value = true
   // Trigger search if no results yet
   if (apiKeyResults.value.length === 0) {

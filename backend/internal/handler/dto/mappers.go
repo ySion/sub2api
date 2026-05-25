@@ -73,6 +73,19 @@ func UserFromServiceAdmin(u *service.User) *AdminUser {
 	}
 }
 
+// UserFromServiceOperator converts a service User to DTO for operator views.
+// 运营员可查看用户运营信息，但不返回管理员备注和用户专属倍率配置。
+func UserFromServiceOperator(u *service.User) *AdminUser {
+	out := UserFromServiceAdmin(u)
+	if out == nil {
+		return nil
+	}
+	out.Notes = ""
+	out.GroupRates = nil
+	out.APIKeys = nil
+	return out
+}
+
 func APIKeyFromService(k *service.APIKey) *APIKey {
 	if k == nil {
 		return nil
@@ -649,6 +662,23 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 		IPAddress:             l.IPAddress,
 		Account:               AccountSummaryFromService(l.Account),
 	}
+}
+
+// UsageLogFromServiceOperator converts a usage log for operator backoffice views.
+// 运营员可查看用量本身，但不能获取用户 API Key、账号名、请求 IP 或账号成本快照。
+func UsageLogFromServiceOperator(l *service.UsageLog) *AdminUsageLog {
+	out := UsageLogFromServiceAdmin(l)
+	if out == nil {
+		return nil
+	}
+	out.APIKeyID = 0
+	out.APIKey = nil
+	out.AccountID = 0
+	out.Account = nil
+	out.IPAddress = nil
+	out.AccountRateMultiplier = nil
+	out.AccountStatsCost = nil
+	return out
 }
 
 func UsageCleanupTaskFromService(task *service.UsageCleanupTask) *UsageCleanupTask {

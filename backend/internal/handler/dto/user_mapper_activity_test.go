@@ -31,3 +31,23 @@ func TestUserFromServiceAdmin_MapsActivityTimestamps(t *testing.T) {
 	require.WithinDuration(t, lastActiveAt, *out.LastActiveAt, time.Second)
 	require.WithinDuration(t, lastUsedAt, *out.LastUsedAt, time.Second)
 }
+
+func TestUserFromServiceOperator_RedactsAdminOnlyFields(t *testing.T) {
+	t.Parallel()
+
+	out := UserFromServiceOperator(&service.User{
+		ID:         43,
+		Email:      "operator-view@example.com",
+		Role:       service.RoleUser,
+		Status:     service.StatusActive,
+		Notes:      "internal note",
+		APIKeys:    []service.APIKey{{ID: 1, Key: "sk-secret"}},
+		GroupRates: map[int64]float64{7: 1.25},
+	})
+
+	require.NotNil(t, out)
+	require.Equal(t, "", out.Notes)
+	require.Nil(t, out.GroupRates)
+	require.Nil(t, out.APIKeys)
+	require.Equal(t, "operator-view@example.com", out.Email)
+}
