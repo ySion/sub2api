@@ -482,15 +482,22 @@ const statusOptions = computed(() => [
   { value: 'disabled', label: t('admin.promo.statusDisabled') }
 ])
 
-const columns = computed<Column[]>(() => [
-  { key: 'code', label: t('admin.promo.columns.code') },
-  { key: 'bonus_amount', label: t('admin.promo.columns.bonusAmount'), sortable: true },
-  { key: 'usage', label: t('admin.promo.columns.usage') },
-  { key: 'status', label: t('admin.promo.columns.status'), sortable: true },
-  { key: 'expires_at', label: t('admin.promo.columns.expiresAt'), sortable: true },
-  { key: 'created_at', label: t('admin.promo.columns.createdAt'), sortable: true },
-  { key: 'actions', label: t('admin.promo.columns.actions') }
-])
+const columns = computed<Column[]>(() => {
+  const baseColumns: Column[] = [
+    { key: 'code', label: t('admin.promo.columns.code') },
+    { key: 'bonus_amount', label: t('admin.promo.columns.bonusAmount'), sortable: true },
+    { key: 'usage', label: t('admin.promo.columns.usage') },
+    { key: 'status', label: t('admin.promo.columns.status'), sortable: true },
+    { key: 'expires_at', label: t('admin.promo.columns.expiresAt'), sortable: true },
+    { key: 'created_at', label: t('admin.promo.columns.createdAt'), sortable: true }
+  ]
+
+  if (canManagePromoCodes.value) {
+    baseColumns.push({ key: 'actions', label: t('admin.promo.columns.actions') })
+  }
+
+  return baseColumns
+})
 
 // Helpers
 const getStatusClass = (status: string, row: PromoCode) => {
