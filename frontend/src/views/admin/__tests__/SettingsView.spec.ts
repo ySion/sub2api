@@ -90,6 +90,12 @@ vi.mock("@/stores", () => ({
     showInfo: vi.fn(),
     fetchPublicSettings,
   }),
+  useAuthStore: () => ({
+    isAdmin: true,
+    isOperator: false,
+    isBackoffice: true,
+    isSimpleMode: false,
+  }),
 }));
 
 vi.mock("@/stores/adminSettings", () => ({
