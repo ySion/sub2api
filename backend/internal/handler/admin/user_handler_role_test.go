@@ -61,7 +61,7 @@ func TestUserHandlerUpdateRoleRejectsInvalidRole(t *testing.T) {
 
 func newUserRoleRouter(actorID int64, svc service.AdminService) *gin.Engine {
 	router := gin.New()
-	h := NewUserHandler(svc, nil)
+	h := NewUserHandler(svc, nil, nil, nil)
 	router.PUT("/api/v1/admin/users/:id/role", func(c *gin.Context) {
 		c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: actorID})
 		c.Next()

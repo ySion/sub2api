@@ -117,6 +117,9 @@ func TestAdminPermissionRoutesAllowOperatorOperationalMutations(t *testing.T) {
 		{name: "subscriptions_extend", method: http.MethodPost, path: "/api/v1/admin/subscriptions/not-number/extend", body: "{}"},
 		{name: "subscriptions_reset_quota", method: http.MethodPost, path: "/api/v1/admin/subscriptions/not-number/reset-quota", body: "{}"},
 		{name: "subscriptions_revoke", method: http.MethodDelete, path: "/api/v1/admin/subscriptions/not-number"},
+		{name: "user_platform_quotas_update", method: http.MethodPut, path: "/api/v1/admin/users/not-number/platform-quotas", body: "{}"},
+		{name: "user_platform_quotas_reset", method: http.MethodPost, path: "/api/v1/admin/users/not-number/platform-quotas/reset", body: "{}"},
+		{name: "group_models_list_candidates", method: http.MethodGet, path: "/api/v1/admin/groups/not-number/models-list-candidates?platform=openai"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := &adminPermissionRouteService{}
@@ -257,7 +260,7 @@ func newAdminPermissionRouteRouter(role string, svc *adminPermissionRouteService
 
 	h := &handler.Handlers{
 		Admin: &handler.AdminHandlers{
-			User:          adminhandler.NewUserHandler(svc, nil),
+			User:          adminhandler.NewUserHandler(svc, nil, nil, nil),
 			Group:         adminhandler.NewGroupHandler(svc, nil, nil),
 			Account:       adminhandler.NewAccountHandler(svc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil),
 			OAuth:         adminhandler.NewOAuthHandler(nil),

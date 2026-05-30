@@ -237,7 +237,11 @@ func registerUserManagementRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterG
 		users.GET("/:id/balance-history", h.Admin.User.GetBalanceHistory)
 		users.GET("/:id/rpm-status", h.Admin.User.GetUserRPMStatus)
 
-		// 权限、密钥和额度变更仅限管理员。
+		// 用户平台配额属于运营资源分配，允许 backoffice；权限、密钥、余额和并发批量变更仍限管理员。
+		users.GET("/:id/platform-quotas", h.Admin.User.GetUserPlatformQuotas)
+		users.PUT("/:id/platform-quotas", h.Admin.User.UpdateUserPlatformQuotas)
+		users.POST("/:id/platform-quotas/reset", h.Admin.User.ResetUserPlatformQuotaWindow)
+
 		usersAdminOnly.POST("/:id/auth-identities", h.Admin.User.BindAuthIdentity)
 		usersAdminOnly.POST("", h.Admin.User.Create)
 		usersAdminOnly.PUT("/:id/role", h.Admin.User.UpdateRole)
@@ -262,6 +266,7 @@ func registerGroupRoutes(admin *gin.RouterGroup, adminOnly *gin.RouterGroup, h *
 		groups.GET("/all", h.Admin.Group.GetAll)
 		groups.GET("/usage-summary", h.Admin.Group.GetUsageSummary)
 		groups.GET("/capacity-summary", h.Admin.Group.GetCapacitySummary)
+		groups.GET("/:id/models-list-candidates", h.Admin.Group.GetModelsListCandidates)
 		groups.GET("/:id", h.Admin.Group.GetByID)
 		groups.GET("/:id/stats", h.Admin.Group.GetStats)
 
@@ -294,6 +299,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		accounts.POST("/:id/test", h.Admin.Account.Test)
 		accounts.POST("/:id/recover-state", h.Admin.Account.RecoverState)
 		accounts.POST("/:id/refresh", h.Admin.Account.Refresh)
+		accounts.POST("/:id/apply-oauth-credentials", h.Admin.Account.ApplyOAuthCredentials)
 		accounts.POST("/:id/set-privacy", h.Admin.Account.SetPrivacy)
 		accounts.POST("/:id/refresh-tier", h.Admin.Account.RefreshTier)
 		accounts.GET("/:id/stats", h.Admin.Account.GetStats)

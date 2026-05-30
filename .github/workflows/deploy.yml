@@ -58,7 +58,7 @@ jobs:
           IMAGE_REF: ${{ steps.image.outputs.latest }}
           DEPLOY_DIR: ${{ secrets.DEPLOY_DIR || '/root/sub2api' }}
           GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || github.token }}
         with:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT || '22' }}
