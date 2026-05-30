@@ -3156,8 +3156,10 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	reqStream bool,
 	startTime time.Time,
 ) (*OpenAIForwardResult, error) {
+	compactPath := isOpenAIResponsesCompactPath(c)
+	clientStream := reqStream && !compactPath
 	upstreamPassthroughModel := ""
-	if isOpenAIResponsesCompactPath(c) {
+	if compactPath {
 		compactMappedModel := resolveOpenAICompactForwardModel(account, reqModel)
 		if compactMappedModel != "" && compactMappedModel != reqModel {
 			nextBody, setErr := sjson.SetBytes(body, "model", compactMappedModel)
@@ -3183,7 +3185,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 			return nil, fmt.Errorf("openai passthrough rejected before upstream: %s", rejectReason)
 		}
 
-		normalizedBody, normalized, err := normalizeOpenAIPassthroughOAuthBody(body, isOpenAIResponsesCompactPath(c))
+		normalizedBody, normalized, err := normalizeOpenAIPassthroughOAuthBody(body, compactPath)
 		if err != nil {
 			return nil, err
 		}
@@ -3339,7 +3341,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	var firstTokenMs *int
 	imageCount := 0
 	var imageOutputSizes []string
-	if reqStream {
+	if clientStream {
 		result, err := s.handleStreamingResponsePassthrough(ctx, resp, c, account, startTime, reqModel, upstreamPassthroughModel)
 		if err != nil {
 			return nil, err
@@ -3373,7 +3375,7 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 		UpstreamModel:   upstreamPassthroughModel,
 		ServiceTier:     serviceTier,
 		ReasoningEffort: reasoningEffort,
-		Stream:          reqStream,
+		Stream:          clientStream,
 		OpenAIWSMode:    false,
 		Duration:        time.Since(startTime),
 		FirstTokenMs:    firstTokenMs,
