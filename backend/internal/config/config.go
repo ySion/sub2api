@@ -696,6 +696,12 @@ type GatewayConfig struct {
 	MaxBodySize int64 `mapstructure:"max_body_size"`
 	// 非流式上游响应体读取上限（字节），用于防止无界读取导致内存放大
 	UpstreamResponseReadMaxBytes int64 `mapstructure:"upstream_response_read_max_bytes"`
+	// NonStreamKeepaliveEnabled: 非流式响应体读取期间是否向下游周期性写入空行。
+	// 默认关闭。仅用于避免客户端/反代在上游长时间未返回完整 JSON 时触发空闲超时。
+	NonStreamKeepaliveEnabled bool `mapstructure:"nonstream_keepalive_enabled"`
+	// NonStreamKeepaliveIntervalSeconds: 非流式 keepalive 空行发送间隔（秒）。
+	// 小于等于 0 时按 30 秒处理；只有 NonStreamKeepaliveEnabled=true 时生效。
+	NonStreamKeepaliveIntervalSeconds int `mapstructure:"nonstream_keepalive_interval_seconds"`
 	// 代理探测响应体读取上限（字节）
 	ProxyProbeResponseReadMaxBytes int64 `mapstructure:"proxy_probe_response_read_max_bytes"`
 	// Gemini 上游响应头调试日志开关（默认关闭，避免高频日志开销）
@@ -1906,6 +1912,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.usage_record.auto_scale_cooldown_seconds", 10)
 	viper.SetDefault("gateway.user_group_rate_cache_ttl_seconds", 30)
 	viper.SetDefault("gateway.models_list_cache_ttl_seconds", 15)
+	viper.SetDefault("gateway.nonstream_keepalive_enabled", false)
+	viper.SetDefault("gateway.nonstream_keepalive_interval_seconds", 30)
 	// TLS指纹伪装配置（默认关闭，需要账号级别单独启用）
 	// 用户消息串行队列默认值
 	viper.SetDefault("gateway.user_message_queue.enabled", false)

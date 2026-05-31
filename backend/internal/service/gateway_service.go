@@ -4580,6 +4580,11 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	// 重试循环
 	var resp *http.Response
 	retryStart := time.Now()
+	stopNonStreamKeepalive := func() {}
+	if !reqStream {
+		stopNonStreamKeepalive = StartGatewayNonStreamKeepalive(ctx, c, s.cfg, s.settingService)
+		defer stopNonStreamKeepalive()
+	}
 	for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
 		// 构建上游请求（每次重试需要重新构建，因为请求体需要重新读取）
 		upstreamCtx, releaseUpstreamCtx := detachStreamUpstreamContext(ctx, reqStream)
@@ -4592,6 +4597,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		// 发送请求
 		resp, err = s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, account.Concurrency, tlsProfile)
 		if err != nil {
+			stopNonStreamKeepalive()
 			if resp != nil && resp.Body != nil {
 				_ = resp.Body.Close()
 			}
@@ -4850,12 +4856,14 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		break
 	}
 	if resp == nil || resp.Body == nil {
+		stopNonStreamKeepalive()
 		return nil, errors.New("upstream request failed: empty response")
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// 处理重试耗尽的情况
 	if resp.StatusCode >= 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) {
+		stopNonStreamKeepalive()
 		if s.shouldFailoverUpstreamError(resp.StatusCode) {
 			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 			_ = resp.Body.Close()
@@ -4892,6 +4900,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 
 	// 处理可切换账号的错误
 	if resp.StatusCode >= 400 && s.shouldFailoverUpstreamError(resp.StatusCode) {
+		stopNonStreamKeepalive()
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 		_ = resp.Body.Close()
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
@@ -4922,6 +4931,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 	}
 	if resp.StatusCode >= 400 {
+		stopNonStreamKeepalive()
 		// 可选：对部分 400 触发 failover（默认关闭以保持语义）
 		if resp.StatusCode == 400 && s.cfg != nil && s.cfg.Gateway.FailoverOn400 {
 			respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
@@ -5069,6 +5079,11 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 
 	var resp *http.Response
 	retryStart := time.Now()
+	stopNonStreamKeepalive := func() {}
+	if !input.RequestStream {
+		stopNonStreamKeepalive = StartGatewayNonStreamKeepalive(ctx, c, s.cfg, s.settingService)
+		defer stopNonStreamKeepalive()
+	}
 	for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
 		upstreamCtx, releaseUpstreamCtx := detachStreamUpstreamContext(ctx, input.RequestStream)
 		upstreamReq, err := s.buildUpstreamRequestAnthropicAPIKeyPassthrough(upstreamCtx, c, account, input.Body, token)
@@ -5079,6 +5094,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 
 		resp, err = s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
 		if err != nil {
+			stopNonStreamKeepalive()
 			if resp != nil && resp.Body != nil {
 				_ = resp.Body.Close()
 			}
@@ -5153,11 +5169,13 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 		break
 	}
 	if resp == nil || resp.Body == nil {
+		stopNonStreamKeepalive()
 		return nil, errors.New("upstream request failed: empty response")
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) {
+		stopNonStreamKeepalive()
 		if s.shouldFailoverUpstreamError(resp.StatusCode) {
 			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 			_ = resp.Body.Close()
@@ -5193,6 +5211,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 	}
 
 	if resp.StatusCode >= 400 && s.shouldFailoverUpstreamError(resp.StatusCode) {
+		stopNonStreamKeepalive()
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 		_ = resp.Body.Close()
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
@@ -5225,6 +5244,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 	}
 
 	if resp.StatusCode >= 400 {
+		stopNonStreamKeepalive()
 		return s.handleErrorResponse(ctx, resp, c, account, input.RequestModel)
 	}
 
@@ -5667,7 +5687,7 @@ func (s *GatewayService) handleNonStreamingResponseAnthropicAPIKeyPassthrough(
 		s.rateLimitService.UpdateSessionWindow(ctx, account, resp.Header)
 	}
 
-	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
+	body, err := ReadUpstreamResponseBodyWithGatewayNonStreamKeepalive(ctx, resp.Body, s.cfg, c, s.settingService, anthropicTooLargeError)
 	if err != nil {
 		return nil, err
 	}
@@ -6060,7 +6080,7 @@ func (s *GatewayService) handleBedrockNonStreamingResponse(
 	c *gin.Context,
 	account *Account,
 ) (*ClaudeUsage, error) {
-	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
+	body, err := ReadUpstreamResponseBodyWithGatewayNonStreamKeepalive(ctx, resp.Body, s.cfg, c, s.settingService, anthropicTooLargeError)
 	if err != nil {
 		return nil, err
 	}
@@ -8027,7 +8047,7 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 	// 更新5h窗口状态
 	s.rateLimitService.UpdateSessionWindow(ctx, account, resp.Header)
 
-	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
+	body, err := ReadUpstreamResponseBodyWithGatewayNonStreamKeepalive(ctx, resp.Body, s.cfg, c, s.settingService, anthropicTooLargeError)
 	if err != nil {
 		return nil, err
 	}
@@ -9276,7 +9296,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 	countTokensTooLarge := func(c *gin.Context) {
 		s.countTokensError(c, http.StatusBadGateway, "upstream_error", "Upstream response too large")
 	}
-	respBody, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, countTokensTooLarge)
+	respBody, err := ReadUpstreamResponseBodyWithGatewayNonStreamKeepalive(ctx, resp.Body, s.cfg, c, s.settingService, countTokensTooLarge)
 	_ = resp.Body.Close()
 	if err != nil {
 		if !errors.Is(err, ErrUpstreamResponseBodyTooLarge) {
@@ -9295,7 +9315,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 			retryResp, retryErr := s.httpUpstream.DoWithTLS(retryReq, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
 			if retryErr == nil {
 				resp = retryResp
-				respBody, err = ReadUpstreamResponseBody(resp.Body, s.cfg, c, countTokensTooLarge)
+				respBody, err = ReadUpstreamResponseBodyWithGatewayNonStreamKeepalive(ctx, resp.Body, s.cfg, c, s.settingService, countTokensTooLarge)
 				_ = resp.Body.Close()
 				if err != nil {
 					if !errors.Is(err, ErrUpstreamResponseBodyTooLarge) {
@@ -9398,7 +9418,7 @@ func (s *GatewayService) forwardCountTokensAnthropicAPIKeyPassthrough(ctx contex
 	countTokensTooLarge := func(c *gin.Context) {
 		s.countTokensError(c, http.StatusBadGateway, "upstream_error", "Upstream response too large")
 	}
-	respBody, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, countTokensTooLarge)
+	respBody, err := ReadUpstreamResponseBodyWithGatewayNonStreamKeepalive(ctx, resp.Body, s.cfg, c, s.settingService, countTokensTooLarge)
 	_ = resp.Body.Close()
 	if err != nil {
 		if !errors.Is(err, ErrUpstreamResponseBodyTooLarge) {

@@ -113,6 +113,11 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 	)
 
 	var resp *http.Response
+	stopNonStreamKeepalive := func() {}
+	if !clientStream {
+		stopNonStreamKeepalive = StartGatewayNonStreamKeepalive(ctx, c, s.cfg, s.settingService)
+		defer stopNonStreamKeepalive()
+	}
 	for attempt := 1; attempt <= geminiMaxRetries; attempt++ {
 		upstreamReq, idHeader, err := buildReq(ctx)
 		if err != nil {
@@ -140,6 +145,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 				continue
 			}
 			setOpsUpstreamError(c, 0, safeErr, "")
+			stopNonStreamKeepalive()
 			return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed after retries: "+safeErr)
 		}
 
@@ -433,7 +439,7 @@ func (s *GeminiMessagesCompatService) handleChatCompletionsNonStreamingResponseF
 	originalModel string,
 	isOAuth bool,
 ) (*ClaudeUsage, error) {
-	respBody, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
+	respBody, err := ReadUpstreamResponseBodyWithGatewayNonStreamKeepalive(c.Request.Context(), resp.Body, s.cfg, c, s.settingService, openAITooLargeError)
 	if err != nil {
 		return nil, err
 	}

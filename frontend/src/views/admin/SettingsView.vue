@@ -3890,6 +3890,60 @@
                 <Toggle v-model="form.rewrite_message_cache_control" />
               </div>
 
+              <!-- 非流式响应保活 -->
+              <div class="space-y-3 border-t border-gray-100 pt-4 dark:border-dark-700">
+                <div class="flex items-center justify-between">
+                  <div class="pr-4">
+                    <label
+                      class="text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      {{
+                        t(
+                          "admin.settings.gatewayForwarding.nonStreamKeepalive",
+                        )
+                      }}
+                    </label>
+                    <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      {{
+                        t(
+                          "admin.settings.gatewayForwarding.nonStreamKeepaliveHint",
+                        )
+                      }}
+                    </p>
+                  </div>
+                  <Toggle v-model="form.nonstream_keepalive_enabled" />
+                </div>
+                <div
+                  v-if="form.nonstream_keepalive_enabled"
+                  class="flex flex-wrap items-end gap-3"
+                >
+                  <div>
+                    <label
+                      class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      {{
+                        t(
+                          "admin.settings.gatewayForwarding.nonStreamKeepaliveInterval",
+                        )
+                      }}
+                    </label>
+                    <input
+                      v-model.number="form.nonstream_keepalive_interval_seconds"
+                      type="number"
+                      min="1"
+                      class="input w-32"
+                    />
+                  </div>
+                  <p class="pb-2 text-xs text-gray-500 dark:text-gray-400">
+                    {{
+                      t(
+                        "admin.settings.gatewayForwarding.nonStreamKeepaliveIntervalHint",
+                      )
+                    }}
+                  </p>
+                </div>
+              </div>
+
               <!-- Antigravity UA 版本 -->
               <div>
                 <label
@@ -7224,6 +7278,8 @@ const form = reactive<SettingsForm>({
   enable_cch_signing: false,
   enable_anthropic_cache_ttl_1h_injection: false,
   rewrite_message_cache_control: false,
+  nonstream_keepalive_enabled: false,
+  nonstream_keepalive_interval_seconds: 30,
   antigravity_user_agent_version: "",
   openai_codex_user_agent: "",
   openai_allow_claude_code_codex_plugin: false,
@@ -8337,6 +8393,9 @@ async function saveSettings() {
       enable_anthropic_cache_ttl_1h_injection:
         form.enable_anthropic_cache_ttl_1h_injection,
       rewrite_message_cache_control: form.rewrite_message_cache_control,
+      nonstream_keepalive_enabled: form.nonstream_keepalive_enabled,
+      nonstream_keepalive_interval_seconds:
+        Number(form.nonstream_keepalive_interval_seconds) || 30,
       antigravity_user_agent_version:
         form.antigravity_user_agent_version?.trim() || "",
       openai_codex_user_agent:

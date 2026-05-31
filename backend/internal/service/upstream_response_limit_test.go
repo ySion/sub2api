@@ -3,8 +3,12 @@ package service
 import (
 	"bytes"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"testing/iotest"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/gin-gonic/gin"
@@ -21,6 +25,15 @@ func TestResolveUpstreamResponseReadLimit(t *testing.T) {
 		cfg.Gateway.UpstreamResponseReadMaxBytes = 1234
 		require.Equal(t, int64(1234), resolveUpstreamResponseReadLimit(cfg))
 	})
+}
+
+func TestNormalizeNonStreamKeepaliveSettings(t *testing.T) {
+	settings := normalizeNonStreamKeepaliveSettings(NonStreamKeepaliveSettings{
+		Enabled:         true,
+		IntervalSeconds: 0,
+	})
+	require.True(t, settings.Enabled)
+	require.Equal(t, DefaultNonStreamKeepaliveIntervalSeconds, settings.IntervalSeconds)
 }
 
 func TestReadUpstreamResponseBodyLimited(t *testing.T) {
@@ -77,4 +90,43 @@ func TestReadUpstreamResponseBody(t *testing.T) {
 		require.False(t, errors.Is(err, ErrUpstreamResponseBodyTooLarge))
 		require.False(t, called)
 	})
+}
+
+func TestReadUpstreamResponseBodyWithNonStreamKeepalive(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+
+	reader := &delayedReader{
+		delay: time.Second + 100*time.Millisecond,
+		body:  []byte(`{"ok":true}`),
+	}
+	body, err := ReadUpstreamResponseBodyWithNonStreamKeepalive(
+		reader,
+		nil,
+		c,
+		NonStreamKeepaliveSettings{Enabled: true, IntervalSeconds: 1},
+		nil,
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, []byte(`{"ok":true}`), body)
+	require.Equal(t, "application/json", recorder.Header().Get("Content-Type"))
+	require.Equal(t, "\n", recorder.Body.String())
+}
+
+type delayedReader struct {
+	delay time.Duration
+	body  []byte
+	done  bool
+}
+
+func (r *delayedReader) Read(p []byte) (int, error) {
+	if r.done {
+		return 0, io.EOF
+	}
+	time.Sleep(r.delay)
+	r.done = true
+	return copy(p, r.body), nil
 }

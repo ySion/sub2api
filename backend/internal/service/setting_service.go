@@ -108,6 +108,8 @@ type cachedGatewayForwardingSettings struct {
 	cchSigning                   bool
 	anthropicCacheTTL1hInjection bool
 	rewriteMessageCacheControl   bool
+	nonStreamKeepaliveEnabled    bool
+	nonStreamKeepaliveInterval   int
 	expiresAt                    int64 // unix nano
 }
 
@@ -1895,6 +1897,12 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyEnableCCHSigning] = strconv.FormatBool(settings.EnableCCHSigning)
 	updates[SettingKeyEnableAnthropicCacheTTL1hInjection] = strconv.FormatBool(settings.EnableAnthropicCacheTTL1hInjection)
 	updates[SettingKeyRewriteMessageCacheControl] = strconv.FormatBool(settings.RewriteMessageCacheControl)
+	updates[SettingKeyNonStreamKeepaliveEnabled] = strconv.FormatBool(settings.NonStreamKeepaliveEnabled)
+	nonStreamKeepalive := normalizeNonStreamKeepaliveSettings(NonStreamKeepaliveSettings{
+		Enabled:         settings.NonStreamKeepaliveEnabled,
+		IntervalSeconds: settings.NonStreamKeepaliveIntervalSeconds,
+	})
+	updates[SettingKeyNonStreamKeepaliveIntervalSeconds] = strconv.Itoa(nonStreamKeepalive.IntervalSeconds)
 	updates[SettingKeyAntigravityUserAgentVersion] = antigravity.NormalizeUserAgentVersion(settings.AntigravityUserAgentVersion)
 	updates[SettingKeyOpenAICodexUserAgent] = strings.TrimSpace(settings.OpenAICodexUserAgent)
 	updates[SettingKeyOpenAIAllowClaudeCodeCodexPlugin] = strconv.FormatBool(settings.OpenAIAllowClaudeCodeCodexPlugin)
@@ -2016,12 +2024,18 @@ func (s *SettingService) refreshCachedSettings(settings *SystemSettings) {
 		expiresAt: time.Now().Add(backendModeCacheTTL).UnixNano(),
 	})
 	gatewayForwardingSF.Forget("gateway_forwarding")
+	nonStreamKeepalive := normalizeNonStreamKeepaliveSettings(NonStreamKeepaliveSettings{
+		Enabled:         settings.NonStreamKeepaliveEnabled,
+		IntervalSeconds: settings.NonStreamKeepaliveIntervalSeconds,
+	})
 	gatewayForwardingCache.Store(&cachedGatewayForwardingSettings{
 		fingerprintUnification:       settings.EnableFingerprintUnification,
 		metadataPassthrough:          settings.EnableMetadataPassthrough,
 		cchSigning:                   settings.EnableCCHSigning,
 		anthropicCacheTTL1hInjection: settings.EnableAnthropicCacheTTL1hInjection,
 		rewriteMessageCacheControl:   settings.RewriteMessageCacheControl,
+		nonStreamKeepaliveEnabled:    nonStreamKeepalive.Enabled,
+		nonStreamKeepaliveInterval:   nonStreamKeepalive.IntervalSeconds,
 		expiresAt:                    time.Now().Add(gatewayForwardingCacheTTL).UnixNano(),
 	})
 	s.antigravityUAVersionSF.Forget("antigravity_user_agent_version")
@@ -2227,6 +2241,25 @@ func (s *SettingService) IsBackendModeEnabled(ctx context.Context) bool {
 
 type gatewayForwardingSettingsResult struct {
 	fp, mp, cch, cacheTTL1h, rewriteMessageCacheControl bool
+	nonStreamKeepalive                                  NonStreamKeepaliveSettings
+}
+
+func (s *SettingService) defaultNonStreamKeepaliveSettings() NonStreamKeepaliveSettings {
+	if s == nil {
+		return NonStreamKeepaliveSettings{Enabled: false, IntervalSeconds: DefaultNonStreamKeepaliveIntervalSeconds}
+	}
+	return nonStreamKeepaliveSettingsFromConfig(s.cfg)
+}
+
+func parseNonStreamKeepaliveInterval(value string, fallback int) int {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || parsed <= 0 {
+		if fallback > 0 {
+			return fallback
+		}
+		return DefaultNonStreamKeepaliveIntervalSeconds
+	}
+	return parsed
 }
 
 func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context) gatewayForwardingSettingsResult {
@@ -2238,6 +2271,10 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 				cch:                        cached.cchSigning,
 				cacheTTL1h:                 cached.anthropicCacheTTL1hInjection,
 				rewriteMessageCacheControl: cached.rewriteMessageCacheControl,
+				nonStreamKeepalive: normalizeNonStreamKeepaliveSettings(NonStreamKeepaliveSettings{
+					Enabled:         cached.nonStreamKeepaliveEnabled,
+					IntervalSeconds: cached.nonStreamKeepaliveInterval,
+				}),
 			}
 		}
 	}
@@ -2250,9 +2287,14 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 					cch:                        cached.cchSigning,
 					cacheTTL1h:                 cached.anthropicCacheTTL1hInjection,
 					rewriteMessageCacheControl: cached.rewriteMessageCacheControl,
+					nonStreamKeepalive: normalizeNonStreamKeepaliveSettings(NonStreamKeepaliveSettings{
+						Enabled:         cached.nonStreamKeepaliveEnabled,
+						IntervalSeconds: cached.nonStreamKeepaliveInterval,
+					}),
 				}, nil
 			}
 		}
+		defaultNonStreamKeepalive := s.defaultNonStreamKeepaliveSettings()
 		dbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), gatewayForwardingDBTimeout)
 		defer cancel()
 		values, err := s.settingRepo.GetMultiple(dbCtx, []string{
@@ -2261,6 +2303,8 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 			SettingKeyEnableCCHSigning,
 			SettingKeyEnableAnthropicCacheTTL1hInjection,
 			SettingKeyRewriteMessageCacheControl,
+			SettingKeyNonStreamKeepaliveEnabled,
+			SettingKeyNonStreamKeepaliveIntervalSeconds,
 		})
 		if err != nil {
 			slog.Warn("failed to get gateway forwarding settings", "error", err)
@@ -2270,9 +2314,11 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 				cchSigning:                   false,
 				anthropicCacheTTL1hInjection: false,
 				rewriteMessageCacheControl:   s.defaultRewriteMessageCacheControl(),
+				nonStreamKeepaliveEnabled:    defaultNonStreamKeepalive.Enabled,
+				nonStreamKeepaliveInterval:   defaultNonStreamKeepalive.IntervalSeconds,
 				expiresAt:                    time.Now().Add(gatewayForwardingErrorTTL).UnixNano(),
 			})
-			return gatewayForwardingSettingsResult{fp: true, rewriteMessageCacheControl: s.defaultRewriteMessageCacheControl()}, nil
+			return gatewayForwardingSettingsResult{fp: true, rewriteMessageCacheControl: s.defaultRewriteMessageCacheControl(), nonStreamKeepalive: defaultNonStreamKeepalive}, nil
 		}
 		fp := true
 		if v, ok := values[SettingKeyEnableFingerprintUnification]; ok && v != "" {
@@ -2285,12 +2331,20 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 		if v, ok := values[SettingKeyRewriteMessageCacheControl]; ok && v != "" {
 			rewriteMessageCacheControl = v == "true"
 		}
+		nonStreamKeepalive := defaultNonStreamKeepalive
+		if v, ok := values[SettingKeyNonStreamKeepaliveEnabled]; ok && v != "" {
+			nonStreamKeepalive.Enabled = v == "true"
+		}
+		nonStreamKeepalive.IntervalSeconds = parseNonStreamKeepaliveInterval(values[SettingKeyNonStreamKeepaliveIntervalSeconds], nonStreamKeepalive.IntervalSeconds)
+		nonStreamKeepalive = normalizeNonStreamKeepaliveSettings(nonStreamKeepalive)
 		gatewayForwardingCache.Store(&cachedGatewayForwardingSettings{
 			fingerprintUnification:       fp,
 			metadataPassthrough:          mp,
 			cchSigning:                   cch,
 			anthropicCacheTTL1hInjection: cacheTTL1h,
 			rewriteMessageCacheControl:   rewriteMessageCacheControl,
+			nonStreamKeepaliveEnabled:    nonStreamKeepalive.Enabled,
+			nonStreamKeepaliveInterval:   nonStreamKeepalive.IntervalSeconds,
 			expiresAt:                    time.Now().Add(gatewayForwardingCacheTTL).UnixNano(),
 		})
 		return gatewayForwardingSettingsResult{
@@ -2299,12 +2353,13 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 			cch:                        cch,
 			cacheTTL1h:                 cacheTTL1h,
 			rewriteMessageCacheControl: rewriteMessageCacheControl,
+			nonStreamKeepalive:         nonStreamKeepalive,
 		}, nil
 	})
 	if r, ok := val.(gatewayForwardingSettingsResult); ok {
 		return r
 	}
-	return gatewayForwardingSettingsResult{fp: true}
+	return gatewayForwardingSettingsResult{fp: true, nonStreamKeepalive: s.defaultNonStreamKeepaliveSettings()}
 }
 
 // GetGatewayForwardingSettings returns cached gateway forwarding settings.
@@ -2318,6 +2373,15 @@ func (s *SettingService) GetGatewayForwardingSettings(ctx context.Context) (fing
 // IsAnthropicCacheTTL1hInjectionEnabled 检查是否对 Anthropic OAuth/SetupToken 请求体注入 1h cache_control ttl。
 func (s *SettingService) IsAnthropicCacheTTL1hInjectionEnabled(ctx context.Context) bool {
 	return s.getGatewayForwardingSettingsCached(ctx).cacheTTL1h
+}
+
+// GetNonStreamKeepaliveSettings 返回非流式响应体读取期间的空行保活设置。
+// 后台设置优先；未配置时回落到 config.yaml，最终默认值为关闭、间隔 30 秒。
+func (s *SettingService) GetNonStreamKeepaliveSettings(ctx context.Context) NonStreamKeepaliveSettings {
+	if s == nil {
+		return NonStreamKeepaliveSettings{Enabled: false, IntervalSeconds: DefaultNonStreamKeepaliveIntervalSeconds}
+	}
+	return normalizeNonStreamKeepaliveSettings(s.getGatewayForwardingSettingsCached(ctx).nonStreamKeepalive)
 }
 
 // IsRewriteMessageCacheControlEnabled 检查是否启用 messages cache_control 改写。
@@ -3329,6 +3393,14 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	} else {
 		result.RewriteMessageCacheControl = s.defaultRewriteMessageCacheControl()
 	}
+	nonStreamKeepalive := s.defaultNonStreamKeepaliveSettings()
+	if v, ok := settings[SettingKeyNonStreamKeepaliveEnabled]; ok && v != "" {
+		nonStreamKeepalive.Enabled = v == "true"
+	}
+	nonStreamKeepalive.IntervalSeconds = parseNonStreamKeepaliveInterval(settings[SettingKeyNonStreamKeepaliveIntervalSeconds], nonStreamKeepalive.IntervalSeconds)
+	nonStreamKeepalive = normalizeNonStreamKeepaliveSettings(nonStreamKeepalive)
+	result.NonStreamKeepaliveEnabled = nonStreamKeepalive.Enabled
+	result.NonStreamKeepaliveIntervalSeconds = nonStreamKeepalive.IntervalSeconds
 	result.AntigravityUserAgentVersion = antigravity.NormalizeUserAgentVersion(settings[SettingKeyAntigravityUserAgentVersion])
 	result.OpenAICodexUserAgent = strings.TrimSpace(settings[SettingKeyOpenAICodexUserAgent])
 	result.OpenAIAllowClaudeCodeCodexPlugin = settings[SettingKeyOpenAIAllowClaudeCodeCodexPlugin] == "true"

@@ -426,6 +426,10 @@ const (
 	SettingKeyEnableAnthropicCacheTTL1hInjection = "enable_anthropic_cache_ttl_1h_injection"
 	// SettingKeyRewriteMessageCacheControl 是否改写 messages[*].content[*].cache_control（默认 false）
 	SettingKeyRewriteMessageCacheControl = "rewrite_message_cache_control"
+	// SettingKeyNonStreamKeepaliveEnabled 非流式响应体读取期间是否向客户端写入空行保活（默认 false）
+	SettingKeyNonStreamKeepaliveEnabled = "nonstream_keepalive_enabled"
+	// SettingKeyNonStreamKeepaliveIntervalSeconds 非流式 keepalive 空行发送间隔秒数（默认 30）
+	SettingKeyNonStreamKeepaliveIntervalSeconds = "nonstream_keepalive_interval_seconds"
 	// SettingKeyAntigravityUserAgentVersion Antigravity 上游 User-Agent 版本号（空值使用环境变量/默认值）
 	SettingKeyAntigravityUserAgentVersion = "antigravity_user_agent_version"
 	// SettingKeyOpenAICodexUserAgent OpenAI Codex 完整 User-Agent（空值使用内置默认）

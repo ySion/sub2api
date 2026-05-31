@@ -254,6 +254,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		EnableCCHSigning:                       settings.EnableCCHSigning,
 		EnableAnthropicCacheTTL1hInjection:     settings.EnableAnthropicCacheTTL1hInjection,
 		RewriteMessageCacheControl:             settings.RewriteMessageCacheControl,
+		NonStreamKeepaliveEnabled:              settings.NonStreamKeepaliveEnabled,
+		NonStreamKeepaliveIntervalSeconds:      settings.NonStreamKeepaliveIntervalSeconds,
 		AntigravityUserAgentVersion:            settings.AntigravityUserAgentVersion,
 		OpenAICodexUserAgent:                   settings.OpenAICodexUserAgent,
 		OpenAIAllowClaudeCodeCodexPlugin:       settings.OpenAIAllowClaudeCodeCodexPlugin,
@@ -587,6 +589,8 @@ type UpdateSettingsRequest struct {
 	EnableCCHSigning                   *bool   `json:"enable_cch_signing"`
 	EnableAnthropicCacheTTL1hInjection *bool   `json:"enable_anthropic_cache_ttl_1h_injection"`
 	RewriteMessageCacheControl         *bool   `json:"rewrite_message_cache_control"`
+	NonStreamKeepaliveEnabled          *bool   `json:"nonstream_keepalive_enabled"`
+	NonStreamKeepaliveIntervalSeconds  *int    `json:"nonstream_keepalive_interval_seconds"`
 	AntigravityUserAgentVersion        *string `json:"antigravity_user_agent_version"`
 	OpenAICodexUserAgent               *string `json:"openai_codex_user_agent"`
 	OpenAIAllowClaudeCodeCodexPlugin   *bool   `json:"openai_allow_claude_code_codex_plugin"`
@@ -891,6 +895,8 @@ func settingsUpdateRequestFromExisting(settings *service.SystemSettings, authSou
 		EnableCCHSigning:                   settingsBoolPtr(settings.EnableCCHSigning),
 		EnableAnthropicCacheTTL1hInjection: settingsBoolPtr(settings.EnableAnthropicCacheTTL1hInjection),
 		RewriteMessageCacheControl:         settingsBoolPtr(settings.RewriteMessageCacheControl),
+		NonStreamKeepaliveEnabled:          settingsBoolPtr(settings.NonStreamKeepaliveEnabled),
+		NonStreamKeepaliveIntervalSeconds:  settingsIntPtr(settings.NonStreamKeepaliveIntervalSeconds),
 		AntigravityUserAgentVersion:        settingsStringPtr(settings.AntigravityUserAgentVersion),
 		OpenAICodexUserAgent:               settingsStringPtr(settings.OpenAICodexUserAgent),
 		PaymentVisibleMethodAlipaySource:   settingsStringPtr(settings.PaymentVisibleMethodAlipaySource),
@@ -2115,6 +2121,18 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.RewriteMessageCacheControl
 		}(),
+		NonStreamKeepaliveEnabled: func() bool {
+			if req.NonStreamKeepaliveEnabled != nil {
+				return *req.NonStreamKeepaliveEnabled
+			}
+			return previousSettings.NonStreamKeepaliveEnabled
+		}(),
+		NonStreamKeepaliveIntervalSeconds: func() int {
+			if req.NonStreamKeepaliveIntervalSeconds != nil {
+				return *req.NonStreamKeepaliveIntervalSeconds
+			}
+			return previousSettings.NonStreamKeepaliveIntervalSeconds
+		}(),
 		AntigravityUserAgentVersion: func() string {
 			if req.AntigravityUserAgentVersion != nil {
 				return *req.AntigravityUserAgentVersion
@@ -2507,6 +2525,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		EnableCCHSigning:                       updatedSettings.EnableCCHSigning,
 		EnableAnthropicCacheTTL1hInjection:     updatedSettings.EnableAnthropicCacheTTL1hInjection,
 		RewriteMessageCacheControl:             updatedSettings.RewriteMessageCacheControl,
+		NonStreamKeepaliveEnabled:              updatedSettings.NonStreamKeepaliveEnabled,
+		NonStreamKeepaliveIntervalSeconds:      updatedSettings.NonStreamKeepaliveIntervalSeconds,
 		AntigravityUserAgentVersion:            updatedSettings.AntigravityUserAgentVersion,
 		OpenAICodexUserAgent:                   updatedSettings.OpenAICodexUserAgent,
 		OpenAIAllowClaudeCodeCodexPlugin:       updatedSettings.OpenAIAllowClaudeCodeCodexPlugin,
@@ -2976,6 +2996,12 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.RewriteMessageCacheControl != after.RewriteMessageCacheControl {
 		changed = append(changed, "rewrite_message_cache_control")
+	}
+	if before.NonStreamKeepaliveEnabled != after.NonStreamKeepaliveEnabled {
+		changed = append(changed, "nonstream_keepalive_enabled")
+	}
+	if before.NonStreamKeepaliveIntervalSeconds != after.NonStreamKeepaliveIntervalSeconds {
+		changed = append(changed, "nonstream_keepalive_interval_seconds")
 	}
 	if before.AntigravityUserAgentVersion != after.AntigravityUserAgentVersion {
 		changed = append(changed, "antigravity_user_agent_version")
